@@ -26,8 +26,8 @@ namespace shl
         using const_iterator = typename CC::const_iterator;
 
     public:
-        [[nodiscard]] consumer(const container_type& container) noexcept(std::is_nothrow_copy_constructible_v<container_type>) : _container(container) {}
-        [[nodiscard]] consumer(container_type&& container) noexcept(std::is_nothrow_move_constructible_v<container_type>) : _container(std::move(container)) {}
+        [[nodiscard]] inline explicit consumer(const container_type& container) noexcept(std::is_nothrow_copy_constructible_v<container_type>) : _container(container) {}
+        [[nodiscard]] inline explicit consumer(container_type&& container) noexcept(std::is_nothrow_move_constructible_v<container_type>) : _container(std::move(container)) {}
 
         consumer(const consumer&) = delete;
         consumer(consumer&&) = delete;
