@@ -7,7 +7,7 @@ namespace shl
 {
     template <typename C>
     concept container =
-    requires(const C& container, const typename C::size_type index)
+    requires(const C& container)
     {
         { container.begin() } -> std::same_as<typename C::const_iterator>;
         { container.end()   } -> std::same_as<typename C::const_iterator>;
@@ -60,7 +60,7 @@ namespace shl
             return std::nullopt;
         }
 
-        // Return the value at the current index and increments the index.
+        // Return the value at the current iterator and advances the iterator.
         // Handles out of bounds checks by terminating, so only call this
         // if you know you have a value, i.e. use peek() to check.
         value_type consume()
