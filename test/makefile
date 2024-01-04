@@ -1,6 +1,6 @@
-SRC_DIR := ./src/
-INT_DIR := ./bin-int/
-OUT_DIR := ./bin/
+SRC_DIR := src/
+INT_DIR := bin-int/
+OUT_DIR := bin/
 NAME := test
 
 SRC := $(SRC_DIR)$(NAME).shl
@@ -31,7 +31,7 @@ $(INT_DIR) $(OUT_DIR):
 
 .PHONY: run
 run: $(EXE)
-	$(EXE); echo $(EXE) exited with return code $$?.
+	./$(EXE); echo $(EXE) exited with return code $$?.
 
 .PHONY: clean
 clean:

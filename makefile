@@ -1,15 +1,15 @@
 # Directory where all source files are located.
-SRC_DIR := ./src/
+SRC_DIR := src/
 # Directory where all intermediate files should be placed.
-OBJ_DIR := ./bin-int/
+OBJ_DIR := bin-int/
 # Directory where all output files should be placed.
-OUT_DIR := ./bin/
+OUT_DIR := bin/
 # Output name.
 OUT_NAME := shl
 # The name of this makefile.
 MAKEFILE := makefile
 
-TEST_DIR := ./test/
+TEST_DIR := test/
 
 # Get all source filepaths in $(SRC_DIR) and all subdirectories of $(SRC_DIR).
 SRC := $(wildcard $(SRC_DIR)**.cpp) $(wildcard $(SRC_DIR)**/*.cpp)
