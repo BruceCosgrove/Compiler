@@ -38,6 +38,8 @@ namespace shl
         ~consumer() noexcept = default;
 
     protected:
+        // If the container has a value at index "index() + offset", returns said value.
+        // Otherwise, returns nothing.
         [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const
         {
             size_type index = _index + offset;
@@ -46,19 +48,30 @@ namespace shl
             return _container.at(index);
         }
 
+        // Return the value at the current index and increments the index.
+        // Handles out of bounds checks by terminating, so only call this
+        // if you know you have a value, i.e. use peek() to check.
         value_type consume()
         {
             return _container.at(_index++);
         }
 
+        // Returns the underlying container.
         [[nodiscard]] const container_type& container() const noexcept
         {
             return _container;
         }
 
+        // Returns the current index.
         [[nodiscard]] size_type index() const noexcept
         {
             return _index;
+        }
+
+        // Resets the index so its ready to consume again if need be.
+        void reset() noexcept
+        {
+            _index = 0;
         }
 
     private:

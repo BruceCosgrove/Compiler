@@ -25,6 +25,7 @@ namespace shl
             else error_exit("Invalid character.");
         }
 
+        reset();
         return tokens;
     }
 
