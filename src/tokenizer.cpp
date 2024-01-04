@@ -1,7 +1,6 @@
 #include "tokenizer.hpp"
 #include "error.hpp"
 #include <cctype>
-#include <iostream> // DEBUG
 
 namespace shl
 {
@@ -11,17 +10,27 @@ namespace shl
 
         while (auto c = peek())
         {
-            if (try_consume_token_value(c, &std::isspace))
+            if (try_consume_token_value(c, &std::isspace, &std::isspace))
                 continue;
             if (auto token_value = try_consume_token_value(c, &std::isalpha, &std::isalnum))
             {
-                if (token_value == "return") tokens.emplace_back(token_type::_return);
-                else error_exit("Invalid identifier.");
+                if (token_value == "return")
+                    tokens.emplace_back(token_type::_return);
+                else if (token_value == "let")
+                    tokens.emplace_back(token_type::_let);
+                else
+                    tokens.emplace_back(token_type::_identifier, token_value);
             }
             else if (auto token_value = try_consume_token_value(c, &std::isdigit, &std::isdigit))
                 tokens.emplace_back(token_type::_integer_literal, token_value);
-            else if (try_consume_token_value(c, [](int c) -> int { return c == ';'; }))
+            else if (try_consume_token_char(c, ';'))
                 tokens.emplace_back(token_type::_semicolon);
+            else if (try_consume_token_char(c, '('))
+                tokens.emplace_back(token_type::_open_parenthesis);
+            else if (try_consume_token_char(c, ')'))
+                tokens.emplace_back(token_type::_close_parenthesis);
+            else if (try_consume_token_char(c, '='))
+                tokens.emplace_back(token_type::_equals);
             else error_exit("Invalid character.");
         }
 
@@ -31,7 +40,7 @@ namespace shl
 
     std::optional<std::string_view> tokenizer::try_consume_token_value(std::optional<char>& c, const token_pred first_pred, const token_pred rest_pred)
     {
-        if (!first_pred(c.value()))
+        if (!first_pred(*c))
             return std::nullopt;
 
         const auto token_begin_it = iterator();
@@ -40,7 +49,7 @@ namespace shl
 
         if (rest_pred)
         {
-            while ((c = peek()) && rest_pred(c.value()))
+            while ((c = peek()) && rest_pred(*c))
             {
                 ++token_end_it;
                 consume();
@@ -48,5 +57,15 @@ namespace shl
         }
 
         return std::string_view(token_begin_it, token_end_it);
+    }
+
+    std::optional<std::string_view> tokenizer::try_consume_token_char(std::optional<char>& c, const char wanted)
+    {
+        if (*c != wanted)
+            return std::nullopt;
+
+        const auto token_begin_it = iterator();
+        consume();
+        return std::string_view(token_begin_it, iterator());
     }
 } // namespace shl

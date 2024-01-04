@@ -21,11 +21,11 @@ namespace shl::fileio
         return false;
     }
 
-    bool write(const std::filesystem::path& file_path, const std::string& file_contents) noexcept
+    bool write(const std::filesystem::path& file_path, const std::string& file_contents, bool append) noexcept
     {
         try
         {
-            std::ofstream file_stream(file_path);
+            std::ofstream file_stream(file_path, append ? std::ios::ate : std::ios::trunc);
             if (file_stream)
             {
                 file_stream.write(file_contents.c_str(), file_contents.size());

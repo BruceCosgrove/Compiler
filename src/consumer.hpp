@@ -50,10 +50,13 @@ namespace shl
             }
             else
             {
-                const difference_type direction = offset > 0 ? 1 : -1;
                 const_iterator it = _it;
-                while (it != _container.end())
-                    std::advance(it, direction);
+                if (offset)
+                {
+                    const difference_type direction = offset > 0 ? 1 : -1;
+                    while (it != _container.end())
+                        std::advance(it, direction);
+                }
                 if (it != _container.end())
                     return *it;
             }

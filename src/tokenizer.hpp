@@ -18,6 +18,7 @@ namespace shl
 
     private:
         using token_pred = int(*)(int);
-        [[nodiscard]] std::optional<std::string_view> try_consume_token_value(std::optional<char>& c, const token_pred first_pred, const token_pred rest_pred = nullptr);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token_value(std::optional<char>& c, const token_pred first_pred, const token_pred rest_pred);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token_char(std::optional<char>& c, const char wanted);
     };
 } // namespace shl

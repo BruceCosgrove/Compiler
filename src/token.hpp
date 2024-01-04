@@ -11,6 +11,11 @@ namespace shl
         _return,
         _integer_literal,
         _semicolon,
+        _open_parenthesis,
+        _close_parenthesis,
+        _identifier,
+        _let,
+        _equals,
     };
 
     constexpr auto operator+(const token_type type) noexcept
