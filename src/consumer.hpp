@@ -42,9 +42,9 @@ namespace shl
         // Otherwise, returns nothing.
         [[nodiscard]] std::optional<value_type> peek(const difference_type offset = 0) const noexcept
         {
-            const_iterator it = std::next(_it, offset);
             if constexpr (std::contiguous_iterator<const_iterator>)
             {
+                const_iterator it = std::next(_it, offset);
                 if (_container.begin() <= it && it < _container.end())
                     return *it;
             }
