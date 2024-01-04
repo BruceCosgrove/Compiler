@@ -40,11 +40,23 @@ namespace shl
     protected:
         // If the container has a value at iterator() + offset, returns said value.
         // Otherwise, returns nothing.
-        [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const noexcept
+        [[nodiscard]] std::optional<value_type> peek(const difference_type offset = 0) const noexcept
         {
             const_iterator it = std::next(_it, offset);
-            if (_container.begin() <= it && it < _container.end())
-                return *it;
+            if constexpr (std::contiguous_iterator<const_iterator>)
+            {
+                if (_container.begin() <= it && it < _container.end())
+                    return *it;
+            }
+            else
+            {
+                const difference_type direction = offset > 0 ? 1 : -1;
+                const_iterator it = _it;
+                while (it != _container.end())
+                    std::advance(it, direction);
+                if (it != _container.end())
+                    return *it;
+            }
             return std::nullopt;
         }
 
@@ -76,6 +88,6 @@ namespace shl
 
     private:
         const container_type _container;
-        const_iterator _it;
+        const_iterator _it; // Since the container is const, _it won't be invalidated.
     };
 } // namespace shl
