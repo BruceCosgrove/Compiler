@@ -1,38 +1,53 @@
 #include "error.hpp"
 #include "fileio.hpp"
+#include "generator.hpp"
+#include "parser.hpp"
 #include "tokenizer.hpp"
 #include <filesystem>
-#include <iostream>
-#include <format>
-#include <getopt.h> // https://linux.die.net/man/3/optarg
+#include <iostream> // DEBUG
+// #include <getopt.h> // https://linux.die.net/man/3/optarg
 
 using namespace shl;
 
-int main(int argc, char* argv[])
+struct input
 {
+    std::filesystem::path in_path;
+    std::filesystem::path out_path;
+};
+
+const input& handle_input(int argc, char* argv[])
+{
+    static input input;
+
     if (!(2 <= argc && argc <= 3))
         error_exit("Incorrect usage. Proper usage is \"shl <input.shl> [output.asm]\".");
 
-    std::filesystem::path in_path = argv[1];
-    std::filesystem::path out_path;
+    input.in_path = argv[1];
     if (argc == 2)
-        out_path = in_path.replace_extension("asm");
+        input.out_path = input.in_path.replace_extension("asm");
     else
-        out_path = argv[2];
+        input.out_path = argv[2];
 
+    return input;
+}
+
+int main(int argc, char* argv[])
+{
+    auto& input = handle_input(argc, argv);
+
+    // Read the input file.
     std::string in_file_contents;
-    if (!fileio::read(in_path, in_file_contents))
+    if (!fileio::read(input.in_path, in_file_contents))
         error_exit("Unable to open input file.");
 
     tokenizer tokenizer(std::move(in_file_contents));
-    auto tokens = tokenizer.tokenize();
-    for (auto& token : tokens)
-    {
-        std::cout << +token.type;
-        if (token.value)
-            std::cout << ": \"" << token.value.value() << '"';
-        std::cout << '\n';
-    }
+    parser parser(tokenizer.tokenize());
+    generator generator(parser.parse());
+    auto assembly = generator.generate();
+
+    // Write the output file.
+    if (!fileio::write(input.out_path, assembly))
+        error_exit("Unable to open output file.");
 
     return EXIT_SUCCESS;
 }

@@ -13,7 +13,7 @@ namespace shl
         _semicolon,
     };
 
-    constexpr auto operator+(const token_type type)
+    constexpr auto operator+(const token_type type) noexcept
     {
         return static_cast<std::underlying_type_t<token_type>>(type);
     }
