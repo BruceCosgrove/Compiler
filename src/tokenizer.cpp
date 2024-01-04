@@ -34,19 +34,19 @@ namespace shl
         if (!first_pred(c.value()))
             return std::nullopt;
 
-        const size_type token_begin_index = index();
+        const auto token_begin_it = iterator();
         consume();
-        size_type token_end_index = index();
+        auto token_end_it = iterator();
 
         if (rest_pred)
         {
             while ((c = peek()) && rest_pred(c.value()))
             {
-                ++token_end_index;
+                ++token_end_it;
                 consume();
             }
         }
 
-        return std::string_view(container()).substr(token_begin_index, token_end_index - token_begin_index);
+        return std::string_view(token_begin_it, token_end_it);
     }
 } // namespace shl

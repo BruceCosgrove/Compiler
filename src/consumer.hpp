@@ -5,29 +5,29 @@
 
 namespace shl
 {
-    template <typename CC>
-    concept contiguous_container =
-    requires(const CC& container, const typename CC::size_type index)
+    template <typename C>
+    concept container =
+    requires(const C& container, const typename C::size_type index)
     {
-        { container.size()    } -> std::same_as<typename CC::size_type>;
-        { container.at(index) } -> std::same_as<typename CC::const_reference>;
-        { container.begin()   } -> std::same_as<typename CC::const_iterator>;
-        { container.end()     } -> std::same_as<typename CC::const_iterator>;
+        { container.begin() } -> std::same_as<typename C::const_iterator>;
+        { container.end()   } -> std::same_as<typename C::const_iterator>;
     };
 
-    template <contiguous_container CC>
+    template <container C>
     class consumer
     {
     public:
-        using container_type = CC;
-        using value_type = typename CC::value_type;
-        using size_type = typename CC::size_type;
-        using difference_type = typename CC::difference_type;
-        using const_iterator = typename CC::const_iterator;
+        using container_type = C;
+        using value_type = typename C::value_type;
+        using size_type = typename C::size_type;
+        using difference_type = typename C::difference_type;
+        using const_iterator = typename C::const_iterator;
 
     public:
-        [[nodiscard]] inline explicit consumer(const container_type& container) noexcept(std::is_nothrow_copy_constructible_v<container_type>) : _container(container) {}
-        [[nodiscard]] inline explicit consumer(container_type&& container) noexcept(std::is_nothrow_move_constructible_v<container_type>) : _container(std::move(container)) {}
+        [[nodiscard]] inline explicit consumer(const container_type& container) noexcept(std::is_nothrow_copy_constructible_v<container_type>)
+            : _container(container), _it(_container.begin()) {}
+        [[nodiscard]] inline explicit consumer(container_type&& container) noexcept(std::is_nothrow_move_constructible_v<container_type>)
+            : _container(std::move(container)), _it(_container.begin()) {}
 
         consumer(const consumer&) = delete;
         consumer(consumer&&) = delete;
@@ -38,14 +38,14 @@ namespace shl
         ~consumer() noexcept = default;
 
     protected:
-        // If the container has a value at index "index() + offset", returns said value.
+        // If the container has a value at iterator() + offset, returns said value.
         // Otherwise, returns nothing.
-        [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const
+        [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const noexcept
         {
-            size_type index = _index + offset;
-            if (index >= _container.size())
-                return std::nullopt;
-            return _container.at(index);
+            const_iterator it = std::next(_it, offset);
+            if (_container.begin() <= it && it < _container.end())
+                return *it;
+            return std::nullopt;
         }
 
         // Return the value at the current index and increments the index.
@@ -53,7 +53,7 @@ namespace shl
         // if you know you have a value, i.e. use peek() to check.
         value_type consume()
         {
-            return _container.at(_index++);
+            return *_it++;
         }
 
         // Returns the underlying container.
@@ -62,20 +62,20 @@ namespace shl
             return _container;
         }
 
-        // Returns the current index.
-        [[nodiscard]] size_type index() const noexcept
+        // Returns the current iterator.
+        [[nodiscard]] const_iterator iterator() const noexcept
         {
-            return _index;
+            return _it;
         }
 
-        // Resets the index so its ready to consume again if need be.
+        // Resets the iterator so its ready to consume again if need be.
         void reset() noexcept
         {
-            _index = 0;
+            _it = _container.begin();
         }
 
     private:
         const container_type _container;
-        size_type _index = 0;
+        const_iterator _it;
     };
 } // namespace shl
