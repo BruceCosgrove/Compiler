@@ -2,6 +2,7 @@
 
 #include "arena_allocator.hpp"
 #include "consumer.hpp"
+#include "error.hpp"
 #include "token.hpp"
 #include "token_nodes.hpp"
 #include <vector>
@@ -34,7 +35,14 @@ namespace shl
 
     private:
         [[nodiscard]] std::optional<token> try_consume(const token_type type);
-        [[nodiscard]] token try_consume(const token_type type, const std::string_view error_message);
+        token try_consume(const token_type type, const std::string_view error_message);
+
+        template <typename Func>
+        [[nodiscard]] auto try_parse(Func func, const std::string_view error_message)
+        {
+            if (auto n = (this->*func)()) return n;
+            else error_exit("Invalid program.");
+        }
 
     private:
         arena_allocator _allocator{1024 * 1024}; // 1 MiB blocks.

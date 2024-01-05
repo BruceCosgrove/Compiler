@@ -1,14 +1,11 @@
 #include "parser.hpp"
-#include "error.hpp"
 
 namespace shl
 {
     node_program* parser::operator()()
     {
-        if (auto n = try_parse_program())
+        if (auto n = try_parse(&parser::try_parse_program, "Invalid program."))
             return n;
-        else
-            error_exit("Invalid program.");
         return nullptr;
     }
 
@@ -16,12 +13,8 @@ namespace shl
     {
         auto _program = _allocator.allocate<node_program>();
         while (peek())
-        {
-            if (auto n = try_parse_statement())
+            if (auto n = try_parse(&parser::try_parse_statement, "Invalid statement."))
                 _program->_statements.push_back(n);
-            else
-                error_exit("Invalid statement.");
-        }
         if (!_program->_statements.empty())
             return _program;
         return nullptr;
@@ -43,9 +36,8 @@ namespace shl
             auto term_expression = _allocator.allocate<node_expression>(n1);
             if (auto n2 = try_parse_binary_operator())
             {
-                if (auto n3 = try_parse_expression())
+                if (auto n3 = try_parse(&parser::try_parse_expression, "TODO: Unary operators."))
                     return _allocator.allocate<node_expression>(_allocator.allocate<node_binary_expression>(term_expression, n2, n3));
-                else error_exit("TODO: Unary operators.");
             }
             else
                 return term_expression;
@@ -99,12 +91,9 @@ namespace shl
         if (try_consume(token_type::_return))
         {
             auto _return = _allocator.allocate<node_return>();
-            if (auto n = try_parse_expression())
+            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression."))
                 _return->_expression = n;
-            else
-                error_exit("Expected expression.");
-            if (!try_consume(token_type::_semicolon))
-                error_exit("Expected ';'.");
+            try_consume(token_type::_semicolon, "Expected ';'.");
             return _return;
         }
         return nullptr;
@@ -115,18 +104,12 @@ namespace shl
         if (try_consume(token_type::_let))
         {
             auto _declare_identifier = _allocator.allocate<node_declare_identifier>();
-            if (auto n = try_parse_identifier())
+            if (auto n = try_parse(&parser::try_parse_identifier, "Expected identifier."))
                 _declare_identifier->_identifier = n;
-            else
-                error_exit("Expected identifier.");
-            if (!try_consume(token_type::_equals))
-                error_exit("Expected '='.");
-            if (auto n = try_parse_expression())
+            try_consume(token_type::_equals, "Expected '='.");
+            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression."))
                 _declare_identifier->_expression = n;
-            else
-                error_exit("Expected expression.");
-            if (!try_consume(token_type::_semicolon))
-                error_exit("Expected ';'.");
+            try_consume(token_type::_semicolon, "Expected ';'.");
             return _declare_identifier;
         }
         return nullptr;
@@ -143,7 +126,6 @@ namespace shl
     {
         if (auto t = peek(); t && t->type == type)
             return consume();
-        else
-            error_exit(error_message);
+        error_exit(error_message);
     }
 } // namespace shl

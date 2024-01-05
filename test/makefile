@@ -26,8 +26,8 @@ COMPILER := ../bin/shl
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)
 
-# Create necessary directories, compile, and make sure to recompile everything if the makefile changed.
-$(ASM): $(SRC) $(MAKEFILE) | create_dirs
+# Create necessary directories, compile, and make sure to recompile if the makefile or compiler changed.
+$(ASM): $(SRC) $(MAKEFILE) $(COMPILER) | create_dirs
 	$(COMPILER) $(SRC) $(ASM)
 
 # Assemble
