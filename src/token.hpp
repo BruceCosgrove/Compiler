@@ -16,6 +16,11 @@ namespace shl
         _identifier,
         _let,
         _equals,
+        _asterisk,
+        _forward_slash,
+        _percent,
+        _plus,
+        _minus,
     };
 
     constexpr auto operator+(const token_type type) noexcept

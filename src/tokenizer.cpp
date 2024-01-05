@@ -31,6 +31,16 @@ namespace shl
                 tokens.emplace_back(token_type::_close_parenthesis);
             else if (try_consume_token_char(c, '='))
                 tokens.emplace_back(token_type::_equals);
+            else if (try_consume_token_char(c, '*'))
+                tokens.emplace_back(token_type::_asterisk);
+            else if (try_consume_token_char(c, '/'))
+                tokens.emplace_back(token_type::_forward_slash);
+            else if (try_consume_token_char(c, '%'))
+                tokens.emplace_back(token_type::_percent);
+            else if (try_consume_token_char(c, '+'))
+                tokens.emplace_back(token_type::_plus);
+            else if (try_consume_token_char(c, '-'))
+                tokens.emplace_back(token_type::_minus);
             else error_exit("Invalid character.");
         }
 

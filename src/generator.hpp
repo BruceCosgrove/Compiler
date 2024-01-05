@@ -18,6 +18,7 @@ namespace shl
         void generate_program();
         void generate_statement(const node_statement* const node);
         void generate_expression(const node_expression* const node);
+        void generate_term(const node_term* const node);
 
     private:
         std::stringstream& output();

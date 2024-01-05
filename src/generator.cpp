@@ -60,11 +60,40 @@ namespace shl
     {
         struct
         {
+            void operator()(const node_term* const node) const
+            {
+                g._output << "term\n";
+                g.generate_term(node);
+            }
+
+            void operator()(const node_binary_expression* const node) const
+            {
+                g._output << "binary_expression\n";
+                g.generate_expression(node->_expression_left);
+                g.generate_expression(node->_expression_right);
+                g.pop() << "rbx\n";
+                g.pop() << "rax\n";
+                g.output() << "add rax, rbx\n";
+                g.push() << "rax\n";
+            }
+
+            generator& g;
+        } visitor(*this);
+
+        output() << "; expression: ";
+        ++_indent_level;
+        std::visit(visitor, node->_expression);
+        --_indent_level;
+    }
+
+    void generator::generate_term(const node_term* const node)
+    {
+        struct
+        {
             void operator()(const node_integer_literal* const node) const
             {
                 g._output << "integer_literal\n";
-                g.output() << "mov rax, " << *node->_token.value << '\n';
-                g.push() << "rax\n";
+                g.push() << "QWORD " << *node->_token.value << '\n';
             }
 
             void operator()(const node_identifier* const node) const
@@ -78,17 +107,12 @@ namespace shl
                 g.push() << "QWORD [rsp + " << stack_location << "]\n";
             }
 
-            void operator()(const node_binary_expression* const node) const
-            {
-                error_exit("node_binary_expression unimplemented.");
-            }
-
             generator& g;
         } visitor(*this);
 
-        output() << "; expression: ";
+        output() << "; term: ";
         ++_indent_level;
-        std::visit(visitor, node->_expression);
+        std::visit(visitor, node->_term);
         --_indent_level;
     }
 

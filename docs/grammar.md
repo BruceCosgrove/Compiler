@@ -8,9 +8,13 @@ $$
     \end{cases} \\
     \text{[expression]} &\to
     \begin{cases}
+        \text{[term]} \\
+        \text{[binary\_expression]} \\
+    \end{cases} \\
+    \text{[term]} &\to
+    \begin{cases}
         \text{[integer\_literal]} \\
         \text{[identifier]} \\
-        \text{[binary\_expression]} \\
     \end{cases} \\
     \text{[binary\_expression]} &\to \text{[expression]}\text{[binary\_operator]}\text{[expression]} \\
     \text{[integer\_literal]} &\to [0-9]^* \\

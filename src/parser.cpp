@@ -36,6 +36,64 @@ namespace shl
         return nullptr;
     }
 
+    node_expression* parser::try_parse_expression()
+    {
+        if (auto n1 = try_parse_term())
+        {
+            auto term_expression = _allocator.allocate<node_expression>(n1);
+            if (auto n2 = try_parse_binary_operator())
+            {
+                if (auto n3 = try_parse_expression())
+                    return _allocator.allocate<node_expression>(_allocator.allocate<node_binary_expression>(term_expression, n2, n3));
+                else error_exit("TODO: Unary operators.");
+            }
+            else
+                return term_expression;
+        }
+        return nullptr;
+    }
+
+    node_term* parser::try_parse_term()
+    {
+        if (auto n = try_parse_integer_literal())
+            return _allocator.allocate<node_term>(n);
+        if (auto n = try_parse_identifier())
+            return _allocator.allocate<node_term>(n);
+        return nullptr;
+    }
+
+    // Embedded in try_parse_expression to make it parse correctly.
+    // [[nodiscard]] node_binary_expression* parser::try_parse_binary_expression() { static_assert(false); return nullptr; }
+
+    node_integer_literal* parser::try_parse_integer_literal()
+    {
+        if (auto t = try_consume(token_type::_integer_literal))
+            return _allocator.allocate<node_integer_literal>(*t);
+        return nullptr;
+    }
+
+    node_identifier* parser::try_parse_identifier()
+    {
+        if (auto t = try_consume(token_type::_identifier))
+            return _allocator.allocate<node_identifier>(*t);
+        return nullptr;
+    }
+
+    node_binary_operator* parser::try_parse_binary_operator()
+    {
+        // if (auto t = try_consume(token_type::_asterisk))
+        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
+        // if (auto t = try_consume(token_type::_forward_slash))
+        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_forward_slash>());
+        // if (auto t = try_consume(token_type::_percent))
+        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_percent>());
+        if (auto t = try_consume(token_type::_plus))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_plus>());
+        // if (auto t = try_consume(token_type::_minus))
+        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_minus>());
+        return nullptr;
+    }
+
     node_return* parser::try_parse_return()
     {
         if (try_consume(token_type::_return))
@@ -74,35 +132,18 @@ namespace shl
         return nullptr;
     }
 
-    node_expression* parser::try_parse_expression()
-    {
-        if (auto n = try_parse_integer_literal())
-            return _allocator.allocate<node_expression>(n);
-        if (auto n = try_parse_identifier())
-            return _allocator.allocate<node_expression>(n);
-        // if (auto n = try_parse_binary_expression())
-        //     return _allocator.allocate<node_binary_expression>(n);
-        return nullptr;
-    }
-
-    node_integer_literal* parser::try_parse_integer_literal()
-    {
-        if (auto t = try_consume(token_type::_integer_literal))
-            return _allocator.allocate<node_integer_literal>(*t);
-        return nullptr;
-    }
-
-    node_identifier* parser::try_parse_identifier()
-    {
-        if (auto t = try_consume(token_type::_identifier))
-            return _allocator.allocate<node_identifier>(*t);
-        return nullptr;
-    }
-
-    std::optional<token> parser::try_consume(token_type type)
+    std::optional<token> parser::try_consume(const token_type type)
     {
         if (auto t = peek(); t && t->type == type)
             return consume();
         return std::nullopt;
+    }
+
+    token parser::try_consume(const token_type type, const std::string_view error_message)
+    {
+        if (auto t = peek(); t && t->type == type)
+            return consume();
+        else
+            error_exit(error_message);
     }
 } // namespace shl
