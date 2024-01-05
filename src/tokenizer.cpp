@@ -14,33 +14,25 @@ namespace shl
                 continue;
             if (auto token_value = try_consume_token_value(c, &std::isalpha, &std::isalnum))
             {
-                if (token_value == "return")
-                    tokens.emplace_back(token_type::_return);
-                else if (token_value == "let")
-                    tokens.emplace_back(token_type::_let);
-                else
-                    tokens.emplace_back(token_type::_identifier, token_value);
+                     if (token_value == "return") tokens.emplace_back(token_type::_return);
+                else if (token_value == "let")    tokens.emplace_back(token_type::_let);
+                else tokens.emplace_back(token_type::_identifier, token_value);
             }
             else if (auto token_value = try_consume_token_value(c, &std::isdigit, &std::isdigit))
                 tokens.emplace_back(token_type::_integer_literal, token_value);
-            else if (try_consume_token_char(c, ';'))
-                tokens.emplace_back(token_type::_semicolon);
-            else if (try_consume_token_char(c, '('))
-                tokens.emplace_back(token_type::_open_parenthesis);
-            else if (try_consume_token_char(c, ')'))
-                tokens.emplace_back(token_type::_close_parenthesis);
-            else if (try_consume_token_char(c, '='))
-                tokens.emplace_back(token_type::_equals);
-            else if (try_consume_token_char(c, '/'))
-                tokens.emplace_back(token_type::_forward_slash);
-            else if (try_consume_token_char(c, '%'))
-                tokens.emplace_back(token_type::_percent);
-            else if (try_consume_token_char(c, '*'))
-                tokens.emplace_back(token_type::_asterisk);
-            else if (try_consume_token_char(c, '+'))
-                tokens.emplace_back(token_type::_plus);
-            else if (try_consume_token_char(c, '-'))
-                tokens.emplace_back(token_type::_minus);
+            else if (try_consume_token_char(c, ';')) tokens.emplace_back(token_type::_semicolon);
+            else if (try_consume_token_char(c, '(')) tokens.emplace_back(token_type::_open_parenthesis);
+            else if (try_consume_token_char(c, ')')) tokens.emplace_back(token_type::_close_parenthesis);
+            else if (try_consume_token_char(c, '{')) tokens.emplace_back(token_type::_open_brace);
+            else if (try_consume_token_char(c, '}')) tokens.emplace_back(token_type::_close_brace);
+            else if (try_consume_token_char(c, '[')) tokens.emplace_back(token_type::_open_bracket);
+            else if (try_consume_token_char(c, ']')) tokens.emplace_back(token_type::_close_bracket);
+            else if (try_consume_token_char(c, '=')) tokens.emplace_back(token_type::_equals);
+            else if (try_consume_token_char(c, '/')) tokens.emplace_back(token_type::_forward_slash);
+            else if (try_consume_token_char(c, '%')) tokens.emplace_back(token_type::_percent);
+            else if (try_consume_token_char(c, '*')) tokens.emplace_back(token_type::_asterisk);
+            else if (try_consume_token_char(c, '+')) tokens.emplace_back(token_type::_plus);
+            else if (try_consume_token_char(c, '-')) tokens.emplace_back(token_type::_minus);
             else error_exit("Invalid character.");
         }
 

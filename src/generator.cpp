@@ -1,5 +1,6 @@
 #include "generator.hpp"
 #include "error.hpp"
+#include <algorithm>
 
 namespace shl
 {
@@ -40,11 +41,16 @@ namespace shl
             void operator()(const node_declare_identifier* const node) const
             {
                 g._output << "declare_identifier\n";
-                if (g._variables.contains(*node->_identifier->_token.value))
+                const std::string_view name = *node->_identifier->_token.value;
+                if (g.get_variable_iterator(name) != g._variables.end())
                     error_exit("Redeclared identifier.");
-                auto& variable = g._variables[*node->_identifier->_token.value];
-                variable.stack_location = g._stack_location;
+                g._variables.emplace_back(name, g._stack_location);
                 g.generate_expression(node->_expression);
+            }
+
+            void operator()(const node_scope* const node) const
+            {
+                g._output << "scope\n";
             }
 
             generator& g;
@@ -99,11 +105,10 @@ namespace shl
             void operator()(const node_identifier* const node) const
             {
                 g._output << "identifier\n";
-                const auto it = g._variables.find(*node->_token.value);
+                const auto it = g.get_variable_iterator(*node->_token.value);
                 if (it == g._variables.end())
-                    error_exit("Undeclared identifier.");
-                const auto& variable = it->second;
-                const std::int64_t stack_location = (g._stack_location - variable.stack_location - 1) * sizeof(std::int64_t);
+                    error_exit("Undeclared identifier in current scope.");
+                const std::ptrdiff_t stack_location = (g._stack_location - it->stack_location - 1) * sizeof(std::uint64_t);
                 g.push() << "QWORD [rsp + " << stack_location << "]\n";
             }
 
@@ -185,5 +190,10 @@ namespace shl
         output() << "pop ";
         --_stack_location;
         return _output;
+    }
+
+    auto generator::get_variable_iterator(const std::string_view name) -> std::vector<variable>::iterator
+    {
+        return std::ranges::find_if(_variables, [=](const variable& variable) { return variable.name == name; });
     }
 } // namespace shl

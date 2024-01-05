@@ -12,8 +12,12 @@ namespace shl
         _return,
         _integer_literal,
         _semicolon,
-        _open_parenthesis,
-        _close_parenthesis,
+        _open_parenthesis,  // (
+        _close_parenthesis, // )
+        _open_brace,        // {
+        _close_brace,       // }
+        _open_bracket,      // [
+        _close_bracket,     // ]
         _identifier,
         _let,
         _equals,

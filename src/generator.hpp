@@ -3,7 +3,7 @@
 #include "token_nodes.hpp"
 #include <sstream>
 #include <string>
-#include <unordered_map>
+#include <vector>
 
 namespace shl
 {
@@ -22,20 +22,24 @@ namespace shl
         void generate_binary_operator(const node_binary_operator* const node);
 
     private:
-        std::stringstream& output();
-        std::stringstream& push();
-        std::stringstream& pop();
+        [[nodiscard]] std::stringstream& output();
+        [[nodiscard]] std::stringstream& push();
+        [[nodiscard]] std::stringstream& pop();
 
     private:
         struct variable
         {
-            std::size_t stack_location;
+            std::string_view name;
+            std::ptrdiff_t stack_location;
         };
+
+    private:
+        [[nodiscard]] std::vector<variable>::iterator get_variable_iterator(const std::string_view name);
 
         const node_program* const _root;
         std::stringstream _output;
         std::size_t _indent_level = 1;
-        std::size_t _stack_location = 0;
-        std::unordered_map<std::string_view, variable> _variables;
+        std::ptrdiff_t _stack_location = 0;
+        std::vector<variable> _variables;
     };
 } // namespace shl

@@ -24,6 +24,7 @@ namespace shl
 
     struct node_return;
     struct node_declare_identifier;
+    struct node_scope;
 
     // Each of these are operators.
     // They only exist for static typing to make this compiler's
@@ -45,7 +46,7 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_return*, node_declare_identifier*> value;
+        std::variant<node_return*, node_declare_identifier*, node_scope*> value;
     };
 
     struct node_expression
@@ -94,5 +95,10 @@ namespace shl
     {
         node_identifier* _identifier;
         node_expression* _expression;
+    };
+
+    struct node_scope
+    {
+        std::vector<node_statement*> _statements;
     };
 } // namespace shl

@@ -5,6 +5,7 @@ $$
     \begin{cases}
         return\space\text{[expression]}; \\
         let\space\text{[identifier]}=\text{[expression]}; \\
+        \{\text{[statement]}^*\}\\
     \end{cases} \\
     \text{[expression]} &\to
     \begin{cases}
