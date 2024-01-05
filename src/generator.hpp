@@ -14,11 +14,12 @@ namespace shl
 
         [[nodiscard]] std::string operator()();
 
-    private: // Each of these correspond to a non-trivial (not entirely regex) grammar rule.
+    private:
         void generate_program();
         void generate_statement(const node_statement* const node);
         void generate_expression(const node_expression* const node);
         void generate_term(const node_term* const node);
+        void generate_binary_operator(const node_binary_operator* const node);
 
     private:
         std::stringstream& output();

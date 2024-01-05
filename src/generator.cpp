@@ -52,7 +52,7 @@ namespace shl
 
         output() << "; statement: ";
         ++_indent_level;
-        std::visit(visitor, node->_statement);
+        std::visit(visitor, node->value);
         --_indent_level;
     }
 
@@ -73,7 +73,7 @@ namespace shl
                 g.generate_expression(node->_expression_right);
                 g.pop() << "rbx\n";
                 g.pop() << "rax\n";
-                g.output() << "add rax, rbx\n";
+                g.generate_binary_operator(node->_binary_operator);
                 g.push() << "rax\n";
             }
 
@@ -82,7 +82,7 @@ namespace shl
 
         output() << "; expression: ";
         ++_indent_level;
-        std::visit(visitor, node->_expression);
+        std::visit(visitor, node->value);
         --_indent_level;
     }
 
@@ -107,12 +107,62 @@ namespace shl
                 g.push() << "QWORD [rsp + " << stack_location << "]\n";
             }
 
+            void operator()(const node_parenthesised_expression* const node) const
+            {
+                g._output << "parenthesised expression\n";
+                g.generate_expression(node->_expression);
+            }
+
             generator& g;
         } visitor(*this);
 
         output() << "; term: ";
         ++_indent_level;
-        std::visit(visitor, node->_term);
+        std::visit(visitor, node->value);
+        --_indent_level;
+    }
+
+    void generator::generate_binary_operator(const node_binary_operator *const node)
+    {
+        struct
+        {
+            void operator()(const node_forward_slash* const node) const
+            {
+                g._output << "/\n";
+                g.output() << "div rbx\n";
+            }
+
+            void operator()(const node_percent* const node) const
+            {
+                g._output << "%\n";
+                g.output() << "div rbx\n";
+                g.output() << "mov rax, rdx\n";
+            }
+
+            void operator()(const node_asterisk* const node) const
+            {
+                g._output << "*\n";
+                g.output() << "mul rbx\n";
+            }
+
+            void operator()(const node_plus* const node) const
+            {
+                g._output << "+\n";
+                g.output() << "add rax, rbx\n";
+            }
+
+            void operator()(const node_minus* const node) const
+            {
+                g._output << "-\n";
+                g.output() << "sub rax, rbx\n";
+            }
+
+            generator& g;
+        } visitor(*this);
+
+        output() << "; binary operator: ";
+        ++_indent_level;
+        std::visit(visitor, node->value);
         --_indent_level;
     }
 

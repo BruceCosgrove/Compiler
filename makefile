@@ -25,7 +25,7 @@ EXE := $(OUT_DIR)$(OUT_NAME)
 # The compiler to use.
 COMPILER := g++-13
 # The compiler flags to use.
-CXXFLAGS := -std=c++23 -Wall
+CXXFLAGS := -std=c++23 -Wall -g
 
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)
@@ -51,6 +51,11 @@ $(DIRS):
 .PHONY: run
 run: $(EXE)
 	$(MAKE) -C $(TEST_DIR) run
+
+# Debugs the test.
+.PHONY: rund
+rund: $(EXE)
+	$(MAKE) -C $(TEST_DIR) rund
 
 # Removes all intermediates and the executable.
 .PHONY: clean

@@ -49,6 +49,11 @@ $(DIRS):
 run: $(EXE)
 	./$(EXE); echo $(EXE) exited with return code $$?.
 
+# Debugs the executable.
+.PHONY: rund
+rund:
+	gdb --args $(COMPILER) $(SRC) $(ASM)
+
 # Removes all intermediates and the executable.
 .PHONY: clean
 clean:

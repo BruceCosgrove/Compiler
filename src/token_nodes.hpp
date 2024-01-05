@@ -17,6 +17,7 @@ namespace shl
     struct node_binary_expression;
     struct node_integer_literal;
     struct node_identifier;
+    struct node_parenthesised_expression;
     struct node_binary_operator;
 
     // Each of these correspond to a grammar subrule.
@@ -25,10 +26,12 @@ namespace shl
     struct node_declare_identifier;
 
     // Each of these are operators.
+    // They only exist for static typing to make this compiler's
+    // compiler scream if you don't have all the right things.
 
-    struct node_asterisk {};
     struct node_forward_slash {};
     struct node_percent {};
+    struct node_asterisk {};
     struct node_plus {};
     struct node_minus {};
 
@@ -42,17 +45,17 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_return*, node_declare_identifier*> _statement;
+        std::variant<node_return*, node_declare_identifier*> value;
     };
 
     struct node_expression
     {
-        std::variant<node_term*, node_binary_expression*> _expression;
+        std::variant<node_term*, node_binary_expression*> value;
     };
 
     struct node_term
     {
-        std::variant<node_integer_literal*, node_identifier*> _term;
+        std::variant<node_integer_literal*, node_identifier*, node_parenthesised_expression*> value;
     };
 
     struct node_binary_expression
@@ -72,10 +75,14 @@ namespace shl
         token _token;
     };
 
+    struct node_parenthesised_expression
+    {
+        node_expression* _expression;
+    };
+
     struct node_binary_operator
     {
-        // TODO: other operators (in the right order).
-        std::variant<node_plus*> _binary_operator;
+        std::variant<node_forward_slash*, node_percent*, node_asterisk*, node_plus*, node_minus*> value;
     };
 
     struct node_return

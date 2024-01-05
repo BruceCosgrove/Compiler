@@ -1,4 +1,5 @@
 #include "parser.hpp"
+#include <iostream> // DEBUG
 
 namespace shl
 {
@@ -29,20 +30,49 @@ namespace shl
         return nullptr;
     }
 
-    node_expression* parser::try_parse_expression()
+    node_expression* parser::try_parse_expression(const std::uint8_t min_precedence)
     {
-        if (auto n1 = try_parse_term())
+        auto term_left = try_parse_term();
+        if (!term_left) return nullptr;
+
+        auto expression = _allocator.allocate<node_expression>(term_left); // create current
+
+        // Operator precedence climbing time!
+        while (const auto token = peek())
         {
-            auto term_expression = _allocator.allocate<node_expression>(n1);
-            if (auto n2 = try_parse_binary_operator())
-            {
-                if (auto n3 = try_parse(&parser::try_parse_expression, "TODO: Unary operators."))
-                    return _allocator.allocate<node_expression>(_allocator.allocate<node_binary_expression>(term_expression, n2, n3));
-            }
-            else
-                return term_expression;
+            const auto precedence = get_operator_precedence(token->type);
+            if (!precedence || precedence < min_precedence) break;
+            const auto next_min_precedence = *precedence + 1;
+
+            const auto [op, _] = consume();
+            static_cast<void>(_); // :/
+
+            auto nbe = _allocator.allocate<node_binary_expression>(); // create parent
+            nbe->_expression_left = expression; // set left
+            nbe->_binary_operator = _allocator.allocate<node_binary_operator>(); // set operator
+
+            // op is guaranteed to be an operator,
+            // so use an index into a constant array
+            // to allocate the correct node type.
+            #define OPERATOR_LAMBDA(type) \
+                {[](arena_allocator& allocator, decltype(nbe->_binary_operator->value)& value) \
+                { value = allocator.allocate<node##type>(); }}
+            struct operator_lambda_wrapper { void(*op)(arena_allocator& allocator, decltype(nbe->_binary_operator->value)& value); };
+            constexpr auto operator_lambdas = std::to_array<operator_lambda_wrapper>
+            ({
+                OPERATOR_LAMBDA(_forward_slash),
+                OPERATOR_LAMBDA(_percent),
+                OPERATOR_LAMBDA(_asterisk),
+                OPERATOR_LAMBDA(_plus),
+                OPERATOR_LAMBDA(_minus),
+            });
+            operator_lambdas[+op - +token_type::operators_begin].op(_allocator, nbe->_binary_operator->value);
+
+            expression = _allocator.allocate<node_expression>(nbe); // create and continue as parent
+            nbe->_expression_right = try_parse_expression(next_min_precedence); // set parent right
         }
-        return nullptr;
+
+        return expression;
     }
 
     node_term* parser::try_parse_term()
@@ -51,6 +81,14 @@ namespace shl
             return _allocator.allocate<node_term>(n);
         if (auto n = try_parse_identifier())
             return _allocator.allocate<node_term>(n);
+        if (try_consume(token_type::_open_parenthesis))
+        {
+            auto _term = _allocator.allocate<node_term>();
+            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                _term->value = _allocator.allocate<node_parenthesised_expression>(n);
+            try_consume(token_type::_close_parenthesis, "Expected ')'.");
+            return _term;
+        }
         return nullptr;
     }
 
@@ -73,16 +111,16 @@ namespace shl
 
     node_binary_operator* parser::try_parse_binary_operator()
     {
-        // if (auto t = try_consume(token_type::_asterisk))
-        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
-        // if (auto t = try_consume(token_type::_forward_slash))
-        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_forward_slash>());
-        // if (auto t = try_consume(token_type::_percent))
-        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_percent>());
+        if (auto t = try_consume(token_type::_asterisk))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
+        if (auto t = try_consume(token_type::_forward_slash))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_forward_slash>());
+        if (auto t = try_consume(token_type::_percent))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_percent>());
         if (auto t = try_consume(token_type::_plus))
             return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_plus>());
-        // if (auto t = try_consume(token_type::_minus))
-        //     return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_minus>());
+        if (auto t = try_consume(token_type::_minus))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_minus>());
         return nullptr;
     }
 
@@ -91,7 +129,7 @@ namespace shl
         if (try_consume(token_type::_return))
         {
             auto _return = _allocator.allocate<node_return>();
-            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression."))
+            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
                 _return->_expression = n;
             try_consume(token_type::_semicolon, "Expected ';'.");
             return _return;
@@ -107,7 +145,7 @@ namespace shl
             if (auto n = try_parse(&parser::try_parse_identifier, "Expected identifier."))
                 _declare_identifier->_identifier = n;
             try_consume(token_type::_equals, "Expected '='.");
-            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression."))
+            if (auto n = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
                 _declare_identifier->_expression = n;
             try_consume(token_type::_semicolon, "Expected ';'.");
             return _declare_identifier;
