@@ -25,6 +25,8 @@ namespace shl
         [[nodiscard]] std::stringstream& output();
         [[nodiscard]] std::stringstream& push();
         [[nodiscard]] std::stringstream& pop();
+        void begin_scope();
+        void end_scope();
 
     private:
         struct variable
@@ -41,5 +43,6 @@ namespace shl
         std::size_t _indent_level = 1;
         std::ptrdiff_t _stack_location = 0;
         std::vector<variable> _variables;
+        std::vector<std::size_t> _scopes;
     };
 } // namespace shl

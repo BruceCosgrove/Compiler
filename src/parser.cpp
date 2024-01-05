@@ -27,6 +27,14 @@ namespace shl
             return _allocator.allocate<node_statement>(n);
         if (auto n = try_parse_declare_identifier())
             return _allocator.allocate<node_statement>(n);
+        if (try_consume(token_type::_open_brace))
+        {
+            auto n_scope = _allocator.allocate<node_scope>();
+            while (auto n = try_parse_statement())
+                n_scope->_statements.push_back(n);
+            try_consume(token_type::_close_brace, "Expected '}'.");
+            return _allocator.allocate<node_statement>(n_scope);
+        }
         return nullptr;
     }
 

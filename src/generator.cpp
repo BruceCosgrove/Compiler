@@ -51,6 +51,10 @@ namespace shl
             void operator()(const node_scope* const node) const
             {
                 g._output << "scope\n";
+                g.begin_scope();
+                for (auto statement : node->_statements)
+                    g.generate_statement(statement);
+                g.end_scope();
             }
 
             generator& g;
@@ -190,6 +194,21 @@ namespace shl
         output() << "pop ";
         --_stack_location;
         return _output;
+    }
+
+    void generator::begin_scope()
+    {
+        _scopes.push_back(_variables.size());
+    }
+
+    void generator::end_scope()
+    {
+        std::size_t pop_count = _variables.size() - _scopes.back();
+        std::size_t pop_size = pop_count * sizeof(std::uint64_t);
+        output() << "add rsp, " << pop_size << '\n';
+        _stack_location -= pop_count;
+        _variables.erase(_variables.end() - pop_count, _variables.end());
+        _scopes.pop_back();
     }
 
     auto generator::get_variable_iterator(const std::string_view name) -> std::vector<variable>::iterator
