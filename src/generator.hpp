@@ -12,7 +12,7 @@ namespace shl
     public:
         [[nodiscard]] inline explicit generator(const node_program* const root) : _root(root) {}
 
-        [[nodiscard]] std::string generate();
+        [[nodiscard]] std::string operator()();
 
     private: // Each of these correspond to a non-trivial (not entirely regex) grammar rule.
         void generate_program();

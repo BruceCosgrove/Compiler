@@ -14,7 +14,7 @@ namespace shl
         [[nodiscard]] inline explicit parser(const std::vector<token>& tokens) : consumer<std::vector<token>>(tokens) {}
         [[nodiscard]] inline explicit parser(std::vector<token>&& tokens) noexcept : consumer<std::vector<token>>(std::move(tokens)) {}
 
-        [[nodiscard]] node_program* parse();
+        [[nodiscard]] node_program* operator()();
 
     private: // Each of these correspond to a node.
         [[nodiscard]] node_program* try_parse_program();

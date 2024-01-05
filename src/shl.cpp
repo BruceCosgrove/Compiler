@@ -40,10 +40,7 @@ int main(int argc, char* argv[])
     if (!fileio::read(input.in_path, in_file_contents))
         error_exit("Unable to open input file.");
 
-    tokenizer tokenizer(std::move(in_file_contents));
-    parser parser(tokenizer.tokenize());
-    generator generator(parser.parse());
-    auto assembly = generator.generate();
+    auto assembly = generator(parser(tokenizer(std::move(in_file_contents))())())();
 
     // Write the output file.
     if (!fileio::write(input.out_path, assembly))

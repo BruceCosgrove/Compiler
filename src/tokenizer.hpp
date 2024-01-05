@@ -14,7 +14,7 @@ namespace shl
         [[nodiscard]] inline explicit tokenizer(const std::string& source_code) noexcept : consumer<std::string>(source_code) {}
         [[nodiscard]] inline explicit tokenizer(std::string&& source_code) noexcept : consumer<std::string>(std::move(source_code)) {}
 
-        [[nodiscard]] std::vector<token> tokenize();
+        [[nodiscard]] std::vector<token> operator()();
 
     private:
         using token_pred = int(*)(int);

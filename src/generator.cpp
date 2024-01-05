@@ -3,7 +3,7 @@
 
 namespace shl
 {
-    std::string generator::generate()
+    std::string generator::operator()()
     {
         generate_program();
 

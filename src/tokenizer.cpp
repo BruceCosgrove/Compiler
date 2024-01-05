@@ -4,7 +4,7 @@
 
 namespace shl
 {
-    std::vector<token> tokenizer::tokenize()
+    std::vector<token> tokenizer::operator()()
     {
         std::vector<token> tokens;
 

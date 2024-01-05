@@ -3,7 +3,7 @@
 
 namespace shl
 {
-    node_program* parser::parse()
+    node_program* parser::operator()()
     {
         if (auto n = try_parse_program())
             return n;
