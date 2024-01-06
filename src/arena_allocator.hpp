@@ -22,6 +22,10 @@ namespace shl
 
         ~arena_allocator() noexcept
         {
+            // Destruct all the objects.
+            for (object_metadata& object : _objects)
+                object.destructor(object.address);
+            // Deallocate all the blocks.
             for (std::uint8_t* block : _blocks)
                 delete[] block;
         }
@@ -29,12 +33,22 @@ namespace shl
         template <typename T, typename... Args> requires(std::is_constructible_v<T, Args...>)
         [[nodiscard]] T* allocate(Args&&... construct_args)
         {
-            void* object = _blocks.back() + (_block_size - _block_size_remaining);
-            object = std::align(alignof(T), sizeof(T), object, _block_size_remaining);
-            if (!object || _block_size_remaining < sizeof(T))
+            std::size_t size_remaning_before = _block_size_remaining;
+
+            // Get the object's address and size (accounting for alignment).
+            void* address = _blocks.back() + (_block_size - _block_size_remaining);
+            address = std::align(alignof(T), sizeof(T), address, _block_size_remaining);
+            if (!address || _block_size_remaining < sizeof(T))
                 allocate_new_buffer();
             _block_size_remaining -= sizeof(T);
-            return new(object) T(std::forward<Args>(construct_args)...);
+
+            // Create the object metadata.
+            std::size_t size_remaning_after = _block_size_remaining;
+            std::size_t object_size = size_remaning_before - size_remaning_after;
+            _objects.emplace_back(address, object_size, [](const void* address) noexcept { static_cast<const T*>(address)->~T(); });
+
+            // Create and return the object.
+            return new(address) T(std::forward<Args>(construct_args)...);
         }
 
     private:
@@ -44,8 +58,16 @@ namespace shl
             _blocks.push_back(new std::uint8_t[_block_size]);
         }
 
+        struct object_metadata
+        {
+            void* address;
+            std::size_t size;
+            void(*destructor)(const void* address) noexcept;
+        };
+
         std::size_t _block_size;
         std::size_t _block_size_remaining;
         std::vector<std::uint8_t*> _blocks;
+        std::vector<object_metadata> _objects;
     };
 } // namespace shl
