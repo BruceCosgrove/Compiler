@@ -21,6 +21,7 @@ namespace shl
         _identifier,
         _let,
         _equals,
+        _if,
 
         // Purely binary operators.
         _forward_slash, // division
@@ -43,6 +44,9 @@ namespace shl
         unary_operators_begin = _asterisk,
         unary_operators_end = _minus + 1,
 
+        binary_and_unary_operators_begin = unary_operators_begin,
+        binary_and_unary_operators_end = binary_operators_end,
+
         operators_begin = binary_operators_begin,
         operators_end = unary_operators_end,
     };
@@ -56,6 +60,9 @@ namespace shl
     [[nodiscard]] constexpr bool is_unary_operator(const token_type type) noexcept
     { return +token_type::unary_operators_begin <= +type && +type < +token_type::unary_operators_end; }
 
+    [[nodiscard]] constexpr bool is_binary_and_unary_operator(const token_type type) noexcept
+    { return +token_type::binary_and_unary_operators_begin <= +type && +type < +token_type::binary_and_unary_operators_end; }
+
     [[nodiscard]] constexpr bool is_operator(const token_type type) noexcept
     { return +token_type::operators_begin <= +type && +type < +token_type::operators_end; }
 
@@ -67,6 +74,7 @@ namespace shl
             ({
                 1, // token_type::_forward_slash
                 1, // token_type::_percent
+
                 1, // token_type::_asterisk
                 0, // token_type::_plus
                 0, // token_type::_minus

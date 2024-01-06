@@ -6,14 +6,11 @@
 namespace shl
 {
     template <typename C>
-    concept container =
-    requires(const C& container)
-    {
-        { container.begin() } -> std::same_as<typename C::const_iterator>;
-        { container.end()   } -> std::same_as<typename C::const_iterator>;
-    };
-
-    template <container C>
+        requires(requires(const C& container)
+        {
+            { container.begin() } -> std::same_as<typename C::const_iterator>;
+            { container.end()   } -> std::same_as<typename C::const_iterator>;
+        })
     class consumer
     {
     public:
@@ -24,9 +21,12 @@ namespace shl
         using const_iterator = typename C::const_iterator;
 
     public:
-        [[nodiscard]] inline explicit consumer(const container_type& container) noexcept(std::is_nothrow_copy_constructible_v<container_type>)
+        [[nodiscard]] inline explicit consumer(const container_type& container)
+            noexcept(std::is_nothrow_copy_constructible_v<container_type>)
             : _container(container), _it(_container.begin()) {}
-        [[nodiscard]] inline explicit consumer(container_type&& container) noexcept(std::is_nothrow_move_constructible_v<container_type>)
+
+        [[nodiscard]] inline explicit consumer(container_type&& container)
+            noexcept(std::is_nothrow_move_constructible_v<container_type>)
             : _container(std::move(container)), _it(_container.begin()) {}
 
         consumer(const consumer&) = delete;
@@ -69,12 +69,6 @@ namespace shl
         value_type consume()
         {
             return *_it++;
-        }
-
-        // Returns the underlying container.
-        [[nodiscard]] const container_type& container() const noexcept
-        {
-            return _container;
         }
 
         // Returns the current iterator.

@@ -21,20 +21,29 @@ namespace shl
         return nullptr;
     }
 
+    node_scope* parser::try_parse_scope()
+    {
+        if (try_consume(token_type::_open_brace))
+        {
+            auto n_scope = _allocator.allocate<node_scope>();
+            while (auto n_statement = try_parse_statement())
+                n_scope->_statements.push_back(n_statement);
+            try_consume(token_type::_close_brace, "Expected '}'.");
+            return n_scope;
+        }
+        return nullptr;
+    }
+
     node_statement* parser::try_parse_statement()
     {
+        if (auto n = try_parse_scope())
+            return _allocator.allocate<node_statement>(n);
         if (auto n = try_parse_return())
             return _allocator.allocate<node_statement>(n);
         if (auto n = try_parse_declare_identifier())
             return _allocator.allocate<node_statement>(n);
-        if (try_consume(token_type::_open_brace))
-        {
-            auto n_scope = _allocator.allocate<node_scope>();
-            while (auto n = try_parse_statement())
-                n_scope->_statements.push_back(n);
-            try_consume(token_type::_close_brace, "Expected '}'.");
-            return _allocator.allocate<node_statement>(n_scope);
-        }
+        if (auto n = try_parse_if())
+            return _allocator.allocate<node_statement>(n);
         return nullptr;
     }
 
@@ -46,35 +55,18 @@ namespace shl
         auto expression = _allocator.allocate<node_expression>(term_left); // create current
 
         // Operator precedence climbing time!
-        while (const auto token = peek())
+        while (const auto t_op = peek())
         {
-            const auto precedence = get_operator_precedence(token->type);
+            const auto precedence = get_operator_precedence(t_op->type);
             if (!precedence || precedence < min_precedence) break;
             const auto next_min_precedence = *precedence + 1;
-
-            const auto [op, _] = consume();
-            static_cast<void>(_); // :/
 
             auto nbe = _allocator.allocate<node_binary_expression>(); // create parent
             nbe->_expression_left = expression; // set left
             nbe->_binary_operator = _allocator.allocate<node_binary_operator>(); // set operator
 
-            // op is guaranteed to be an operator,
-            // so use an index into a constant array
-            // to allocate the correct node type.
-            #define OPERATOR_LAMBDA(type) \
-                {[](arena_allocator& allocator, decltype(nbe->_binary_operator->value)& value) \
-                { value = allocator.allocate<node##type>(); }}
-            struct operator_lambda_wrapper { void(*op)(arena_allocator& allocator, decltype(nbe->_binary_operator->value)& value); };
-            constexpr auto operator_lambdas = std::to_array<operator_lambda_wrapper>
-            ({
-                OPERATOR_LAMBDA(_forward_slash),
-                OPERATOR_LAMBDA(_percent),
-                OPERATOR_LAMBDA(_asterisk),
-                OPERATOR_LAMBDA(_plus),
-                OPERATOR_LAMBDA(_minus),
-            });
-            operator_lambdas[+op - +token_type::operators_begin].op(_allocator, nbe->_binary_operator->value);
+            if (auto n_binary_operator = try_parse_binary_operator())
+                nbe->_binary_operator = n_binary_operator;
 
             expression = _allocator.allocate<node_expression>(nbe); // create and continue as parent
             nbe->_expression_right = try_parse_expression(next_min_precedence); // set parent right
@@ -100,34 +92,17 @@ namespace shl
         return nullptr;
     }
 
-    // Embedded in try_parse_expression to make it parse correctly.
-    // [[nodiscard]] node_binary_expression* parser::try_parse_binary_expression() { static_assert(false); return nullptr; }
-
-    node_integer_literal* parser::try_parse_integer_literal()
-    {
-        if (auto t = try_consume(token_type::_integer_literal))
-            return _allocator.allocate<node_integer_literal>(*t);
-        return nullptr;
-    }
-
-    node_identifier* parser::try_parse_identifier()
-    {
-        if (auto t = try_consume(token_type::_identifier))
-            return _allocator.allocate<node_identifier>(*t);
-        return nullptr;
-    }
-
     node_binary_operator* parser::try_parse_binary_operator()
     {
-        if (auto t = try_consume(token_type::_asterisk))
-            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
-        if (auto t = try_consume(token_type::_forward_slash))
+        if (try_consume(token_type::_forward_slash))
             return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_forward_slash>());
-        if (auto t = try_consume(token_type::_percent))
+        if (try_consume(token_type::_percent))
             return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_percent>());
-        if (auto t = try_consume(token_type::_plus))
+        if (try_consume(token_type::_asterisk))
+            return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
+        if (try_consume(token_type::_plus))
             return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_plus>());
-        if (auto t = try_consume(token_type::_minus))
+        if (try_consume(token_type::_minus))
             return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_minus>());
         return nullptr;
     }
@@ -158,6 +133,34 @@ namespace shl
             try_consume(token_type::_semicolon, "Expected ';'.");
             return _declare_identifier;
         }
+        return nullptr;
+    }
+
+    node_if* parser::try_parse_if()
+    {
+        if (try_consume(token_type::_if))
+        {
+            auto n_if = _allocator.allocate<node_if>();
+            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                n_if->_expression = n_expression;
+            if (auto n_scope = try_parse(&parser::try_parse_scope, "Expected scope."))
+                n_if->_scope = n_scope;
+            return n_if;
+        }
+        return nullptr;
+    }
+
+    node_integer_literal* parser::try_parse_integer_literal()
+    {
+        if (auto t = try_consume(token_type::_integer_literal))
+            return _allocator.allocate<node_integer_literal>(*t);
+        return nullptr;
+    }
+
+    node_identifier* parser::try_parse_identifier()
+    {
+        if (auto t = try_consume(token_type::_identifier))
+            return _allocator.allocate<node_identifier>(*t);
         return nullptr;
     }
 

@@ -15,7 +15,13 @@ namespace shl
         [[nodiscard]] std::string operator()();
 
     private:
+        // Correspondence: Single-case grammar rule.
+
         void generate_program();
+        void generate_scope(const node_scope* const node);
+
+        // Correspondence: Multi-case grammar rule.
+
         void generate_statement(const node_statement* const node);
         void generate_expression(const node_expression* const node);
         void generate_term(const node_term* const node);
@@ -27,6 +33,9 @@ namespace shl
         [[nodiscard]] std::stringstream& pop();
         void begin_scope();
         void end_scope();
+
+        void output_label(std::string_view label);
+        std::string create_label();
 
     private:
         struct variable
@@ -44,5 +53,6 @@ namespace shl
         std::ptrdiff_t _stack_location = 0;
         std::vector<variable> _variables;
         std::vector<std::size_t> _scopes;
+        std::size_t _label_count = 0;
     };
 } // namespace shl

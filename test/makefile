@@ -22,13 +22,15 @@ EXE := $(OUT_DIR)$(OUT_NAME)
 
 # The compiler to use.
 COMPILER := ../bin/shl
+# The whole compilation command.
+COMPILE := $(COMPILER) $(SRC) -o $(ASM)
 
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)
 
 # Create necessary directories, compile, and make sure to recompile if the makefile or compiler changed.
 $(ASM): $(SRC) $(MAKEFILE) $(COMPILER) | create_dirs
-	$(COMPILER) $(SRC) $(ASM)
+	$(COMPILE)
 
 # Assemble
 $(OBJ): $(ASM) $(MAKEFILE)
@@ -52,7 +54,7 @@ run: $(EXE)
 # Debugs the executable.
 .PHONY: rund
 rund:
-	gdb --args $(COMPILER) $(SRC) $(ASM)
+	gdb --args $(COMPILE)
 
 # Removes all intermediates and the executable.
 .PHONY: clean

@@ -17,21 +17,30 @@ namespace shl
 
         [[nodiscard]] node_program* operator()();
 
-    private: // Each of these correspond to a node.
+    private:
+        // Correspondence: Single-case grammar rule.
+
         [[nodiscard]] node_program* try_parse_program();
+        [[nodiscard]] node_scope* try_parse_scope();
+
+        // Correspondence: Multi-case grammar rule.
+
         [[nodiscard]] node_statement* try_parse_statement();
+        // Also parses operator precedence.
         [[nodiscard]] node_expression* try_parse_expression(const std::uint8_t min_precedence = 0);
         [[nodiscard]] node_term* try_parse_term();
-
-        // Embedded in try_parse_expression to make it parse correctly.
-        // [[nodiscard]] node_binary_expression* try_parse_binary_expression();
-
-        [[nodiscard]] node_integer_literal* try_parse_integer_literal();
-        [[nodiscard]] node_identifier* try_parse_identifier();
         [[nodiscard]] node_binary_operator* try_parse_binary_operator();
+
+        // Correspondence: Non-trivial grammar rule case.
 
         [[nodiscard]] node_return* try_parse_return();
         [[nodiscard]] node_declare_identifier* try_parse_declare_identifier();
+        [[nodiscard]] node_if* try_parse_if();
+
+        // Correspondence: Trivial grammar rule.
+
+        [[nodiscard]] node_integer_literal* try_parse_integer_literal();
+        [[nodiscard]] node_identifier* try_parse_identifier();
 
     private:
         [[nodiscard]] std::optional<token> try_consume(const token_type type);

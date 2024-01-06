@@ -16,6 +16,7 @@ namespace shl
             {
                      if (token_value == "return") tokens.emplace_back(token_type::_return);
                 else if (token_value == "let")    tokens.emplace_back(token_type::_let);
+                else if (token_value == "if")     tokens.emplace_back(token_type::_if);
                 else tokens.emplace_back(token_type::_identifier, token_value);
             }
             else if (auto token_value = try_consume_token_value(c, &std::isdigit, &std::isdigit))
