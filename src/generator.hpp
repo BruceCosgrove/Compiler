@@ -10,7 +10,7 @@ namespace shl
     class generator // Making this a consumer turned out to be too much overhead.
     {
     public:
-        [[nodiscard]] inline explicit generator(node_program* root) : _root(root) {}
+        [[nodiscard]] explicit generator(node_program* root) : _root(root) {}
 
         [[nodiscard]] std::string operator()();
 
