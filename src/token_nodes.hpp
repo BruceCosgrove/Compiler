@@ -52,73 +52,73 @@ namespace shl
 
     struct node_program
     {
-        std::vector<node_statement*> _statements;
+        std::vector<node_statement*> statements;
     };
 
     struct node_scope
     {
-        std::vector<node_statement*> _statements;
+        std::vector<node_statement*> statements;
     };
 
 
     struct node_statement
     {
-        std::variant<node_scope*, node_return*, node_declare_identifier*, node_if*> value;
+        std::variant<node_scope*, node_return*, node_declare_identifier*, node_if*> n_value;
     };
 
     struct node_expression
     {
-        std::variant<node_term*, node_binary_expression*> value;
+        std::variant<node_term*, node_binary_expression*> n_value;
     };
 
     struct node_term
     {
-        std::variant<node_integer_literal*, node_identifier*, node_parenthesised_expression*> value;
+        std::variant<node_integer_literal*, node_identifier*, node_parenthesised_expression*> n_value;
     };
 
     struct node_binary_operator
     {
-        std::variant<node_forward_slash*, node_percent*, node_asterisk*, node_plus*, node_minus*> value;
+        std::variant<node_forward_slash*, node_percent*, node_asterisk*, node_plus*, node_minus*> n_value;
     };
 
 
     struct node_integer_literal
     {
-        token _token;
+        std::string_view value;
     };
 
     struct node_identifier
     {
-        token _token;
+        std::string_view value;
     };
 
 
     struct node_return
     {
-        node_expression* _expression;
+        node_expression* n_expression;
     };
 
     struct node_declare_identifier
     {
-        node_identifier* _identifier;
-        node_expression* _expression;
+        node_identifier* n_identifier;
+        node_expression* n_expression;
     };
 
     struct node_if
     {
-        node_expression* _expression;
-        node_scope* _scope;
+        node_expression* n_expression;
+        node_scope* n_scope;
     };
 
     struct node_binary_expression
     {
-        node_expression* _expression_left;
-        node_binary_operator* _binary_operator;
-        node_expression* _expression_right;
+        node_expression* n_expression_lhs;
+        node_binary_operator* n_binary_operator;
+        node_expression* n_expression_rhs;
     };
 
     struct node_parenthesised_expression
     {
-        node_expression* _expression;
+        node_expression* n_expression;
     };
 } // namespace shl

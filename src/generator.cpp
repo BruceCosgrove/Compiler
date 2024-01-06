@@ -19,7 +19,7 @@ namespace shl
         _output << "global _start\n";
         output_label("_start");
 
-        for (const node_statement* const node : _root->_statements)
+        for (const node_statement* node : _root->statements)
             generate_statement(node);
 
         output() << "mov rax, 60\n";
@@ -27,44 +27,44 @@ namespace shl
         output() << "syscall\n";
     }
 
-    void generator::generate_statement(const node_statement* const node)
+    void generator::generate_statement(const node_statement* node)
     {
         struct
         {
-            void operator()(const node_scope* const node) const
+            void operator()(const node_scope* node) const
             {
                 IF_VERBOSE g._output << "scope\n";
                 g.generate_scope(node);
             }
 
-            void operator()(const node_return* const node) const
+            void operator()(const node_return* node) const
             {
                 IF_VERBOSE g._output << "return\n";
-                g.generate_expression(node->_expression);
+                g.generate_expression(node->n_expression);
                 g.output() << "mov rax, 60\n";
                 g.pop() << "rdi\n";
                 g.output() << "syscall\n";
             }
 
-            void operator()(const node_declare_identifier* const node) const
+            void operator()(const node_declare_identifier* node) const
             {
                 IF_VERBOSE g._output << "declare_identifier\n";
-                const std::string_view name = *node->_identifier->_token.value;
+                std::string_view name = node->n_identifier->value;
                 if (g.get_variable_iterator(name) != g._variables.end())
                     error_exit("Redeclared identifier.");
                 g._variables.emplace_back(name, g._stack_location);
-                g.generate_expression(node->_expression);
+                g.generate_expression(node->n_expression);
             }
 
-            void operator()(const node_if* const node) const
+            void operator()(const node_if* node) const
             {
                 IF_VERBOSE g._output << "if\n";
-                g.generate_expression(node->_expression);
+                g.generate_expression(node->n_expression);
                 std::string label_end_if = g.create_label();
                 g.pop() << "rax\n";
                 g.output() << "test rax, rax\n";
                 g.output() << "jz " << label_end_if << '\n';
-                g.generate_scope(node->_scope);
+                g.generate_scope(node->n_scope);
                 g.output_label(label_end_if);
             }
 
@@ -73,28 +73,28 @@ namespace shl
 
         IF_VERBOSE output() << "; statement: ";
         ++_indent_level;
-        std::visit(visitor, node->value);
+        std::visit(visitor, node->n_value);
         --_indent_level;
     }
 
-    void generator::generate_expression(const node_expression* const node)
+    void generator::generate_expression(const node_expression* node)
     {
         struct
         {
-            void operator()(const node_term* const node) const
+            void operator()(const node_term* node) const
             {
                 IF_VERBOSE g._output << "term\n";
                 g.generate_term(node);
             }
 
-            void operator()(const node_binary_expression* const node) const
+            void operator()(const node_binary_expression* node) const
             {
                 IF_VERBOSE g._output << "binary_expression\n";
-                g.generate_expression(node->_expression_left);
-                g.generate_expression(node->_expression_right);
+                g.generate_expression(node->n_expression_lhs);
+                g.generate_expression(node->n_expression_rhs);
                 g.pop() << "rbx\n";
                 g.pop() << "rax\n";
-                g.generate_binary_operator(node->_binary_operator);
+                g.generate_binary_operator(node->n_binary_operator);
                 g.push() << "rax\n";
             }
 
@@ -103,34 +103,34 @@ namespace shl
 
         IF_VERBOSE output() << "; expression: ";
         ++_indent_level;
-        std::visit(visitor, node->value);
+        std::visit(visitor, node->n_value);
         --_indent_level;
     }
 
-    void generator::generate_term(const node_term* const node)
+    void generator::generate_term(const node_term* node)
     {
         struct
         {
-            void operator()(const node_integer_literal* const node) const
+            void operator()(const node_integer_literal* node) const
             {
                 IF_VERBOSE g._output << "integer_literal\n";
-                g.push() << "QWORD " << *node->_token.value << '\n';
+                g.push() << "QWORD " << node->value << '\n';
             }
 
-            void operator()(const node_identifier* const node) const
+            void operator()(const node_identifier* node) const
             {
                 IF_VERBOSE g._output << "identifier\n";
-                const auto it = g.get_variable_iterator(*node->_token.value);
+                auto it = g.get_variable_iterator(node->value);
                 if (it == g._variables.end())
                     error_exit("Undeclared identifier in current scope.");
-                const std::ptrdiff_t stack_location = (g._stack_location - it->stack_location - 1) * sizeof(std::uint64_t);
+                std::ptrdiff_t stack_location = (g._stack_location - it->stack_location - 1) * sizeof(std::uint64_t);
                 g.push() << "QWORD [rsp + " << stack_location << "]\n";
             }
 
-            void operator()(const node_parenthesised_expression* const node) const
+            void operator()(const node_parenthesised_expression* node) const
             {
                 IF_VERBOSE g._output << "parenthesised expression\n";
-                g.generate_expression(node->_expression);
+                g.generate_expression(node->n_expression);
             }
 
             generator& g;
@@ -138,40 +138,40 @@ namespace shl
 
         IF_VERBOSE output() << "; term: ";
         ++_indent_level;
-        std::visit(visitor, node->value);
+        std::visit(visitor, node->n_value);
         --_indent_level;
     }
 
-    void generator::generate_binary_operator(const node_binary_operator *const node)
+    void generator::generate_binary_operator(const node_binary_operator *node)
     {
         struct
         {
-            void operator()(const node_forward_slash* const node) const
+            void operator()(const node_forward_slash* node) const
             {
                 IF_VERBOSE g._output << "/\n";
                 g.output() << "div rbx\n";
             }
 
-            void operator()(const node_percent* const node) const
+            void operator()(const node_percent* node) const
             {
                 IF_VERBOSE g._output << "%\n";
                 g.output() << "div rbx\n";
                 g.output() << "mov rax, rdx\n";
             }
 
-            void operator()(const node_asterisk* const node) const
+            void operator()(const node_asterisk* node) const
             {
                 IF_VERBOSE g._output << "*\n";
                 g.output() << "mul rbx\n";
             }
 
-            void operator()(const node_plus* const node) const
+            void operator()(const node_plus* node) const
             {
                 IF_VERBOSE g._output << "+\n";
                 g.output() << "add rax, rbx\n";
             }
 
-            void operator()(const node_minus* const node) const
+            void operator()(const node_minus* node) const
             {
                 IF_VERBOSE g._output << "-\n";
                 g.output() << "sub rax, rbx\n";
@@ -182,14 +182,14 @@ namespace shl
 
         IF_VERBOSE output() << "; binary operator: ";
         ++_indent_level;
-        std::visit(visitor, node->value);
+        std::visit(visitor, node->n_value);
         --_indent_level;
     }
 
-    void generator::generate_scope(const node_scope* const node)
+    void generator::generate_scope(const node_scope* node)
     {
         begin_scope();
-        for (auto statement : node->_statements)
+        for (auto statement : node->statements)
             generate_statement(statement);
         end_scope();
     }
@@ -248,7 +248,7 @@ namespace shl
         return "label" + std::to_string(_label_count++);
     }
 
-    auto generator::get_variable_iterator(const std::string_view name) -> std::vector<variable>::iterator
+    auto generator::get_variable_iterator(std::string_view name) -> std::vector<variable>::iterator
     {
         return std::ranges::find_if(_variables, [=](const variable& variable) { return variable.name == name; });
     }

@@ -14,7 +14,7 @@ namespace shl
         arena_allocator& operator=(const arena_allocator&) = delete;
         arena_allocator& operator=(arena_allocator&&) = delete;
 
-        [[nodiscard]] inline explicit arena_allocator(const std::size_t block_size) noexcept
+        [[nodiscard]] inline explicit arena_allocator(std::size_t block_size) noexcept
             : _block_size(block_size)
         {
             allocate_new_buffer();

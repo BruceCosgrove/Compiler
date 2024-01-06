@@ -40,7 +40,7 @@ namespace shl
     protected:
         // If the container has a value at iterator() + offset, returns said value.
         // Otherwise, returns nothing.
-        [[nodiscard]] std::optional<value_type> peek(const difference_type offset = 0) const noexcept
+        [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const noexcept
         {
             if constexpr (std::contiguous_iterator<const_iterator>)
             {
@@ -53,7 +53,7 @@ namespace shl
                 const_iterator it = _it;
                 if (offset)
                 {
-                    const difference_type direction = offset > 0 ? 1 : -1;
+                    difference_type direction = offset > 0 ? 1 : -1;
                     while (it != _container.end())
                         std::advance(it, direction);
                 }

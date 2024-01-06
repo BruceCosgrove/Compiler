@@ -27,7 +27,7 @@ namespace shl
 
         [[nodiscard]] node_statement* try_parse_statement();
         // Also parses operator precedence.
-        [[nodiscard]] node_expression* try_parse_expression(const std::uint8_t min_precedence = 0);
+        [[nodiscard]] node_expression* try_parse_expression(std::uint8_t min_precedence = 0);
         [[nodiscard]] node_term* try_parse_term();
         [[nodiscard]] node_binary_operator* try_parse_binary_operator();
 
@@ -43,11 +43,11 @@ namespace shl
         [[nodiscard]] node_identifier* try_parse_identifier();
 
     private:
-        [[nodiscard]] std::optional<token> try_consume(const token_type type);
-        token try_consume(const token_type type, const std::string_view error_message);
+        [[nodiscard]] std::optional<token> try_consume(token_type type);
+        token try_consume(token_type type, std::string_view error_message);
 
         template <typename Func, typename... Args>
-        [[nodiscard]] auto try_parse(Func func, const std::string_view error_message, Args&&... args)
+        [[nodiscard]] auto try_parse(Func func, std::string_view error_message, Args&&... args)
         {
             if (auto n = (this->*func)(std::forward<Args>(args)...)) return n;
             else error_exit("Invalid program.");

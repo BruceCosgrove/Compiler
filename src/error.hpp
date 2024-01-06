@@ -4,5 +4,5 @@
 
 namespace shl
 {
-    [[noreturn]] void error_exit(const std::string_view error_message);
+    [[noreturn]] void error_exit(std::string_view error_message);
 } // namespace shl

@@ -12,28 +12,30 @@ namespace shl
         {
             if (try_consume_token_value(c, &std::isspace, &std::isspace))
                 continue;
-            if (auto token_value = try_consume_token_value(c, &std::isalpha, &std::isalnum))
-            {
-                     if (token_value == "return") tokens.emplace_back(token_type::_return);
-                else if (token_value == "let")    tokens.emplace_back(token_type::_let);
-                else if (token_value == "if")     tokens.emplace_back(token_type::_if);
-                else tokens.emplace_back(token_type::_identifier, token_value);
-            }
             else if (auto token_value = try_consume_token_value(c, &std::isdigit, &std::isdigit))
-                tokens.emplace_back(token_type::_integer_literal, token_value);
-            else if (try_consume_token_char(c, ';')) tokens.emplace_back(token_type::_semicolon);
-            else if (try_consume_token_char(c, '(')) tokens.emplace_back(token_type::_open_parenthesis);
-            else if (try_consume_token_char(c, ')')) tokens.emplace_back(token_type::_close_parenthesis);
-            else if (try_consume_token_char(c, '{')) tokens.emplace_back(token_type::_open_brace);
-            else if (try_consume_token_char(c, '}')) tokens.emplace_back(token_type::_close_brace);
-            else if (try_consume_token_char(c, '[')) tokens.emplace_back(token_type::_open_bracket);
-            else if (try_consume_token_char(c, ']')) tokens.emplace_back(token_type::_close_bracket);
-            else if (try_consume_token_char(c, '=')) tokens.emplace_back(token_type::_equals);
-            else if (try_consume_token_char(c, '/')) tokens.emplace_back(token_type::_forward_slash);
-            else if (try_consume_token_char(c, '%')) tokens.emplace_back(token_type::_percent);
-            else if (try_consume_token_char(c, '*')) tokens.emplace_back(token_type::_asterisk);
-            else if (try_consume_token_char(c, '+')) tokens.emplace_back(token_type::_plus);
-            else if (try_consume_token_char(c, '-')) tokens.emplace_back(token_type::_minus);
+                tokens.emplace_back(token_type::integer_literal_, token_value);
+            else if (auto token_value = try_consume_token_value(c, &std::isalpha, &std::isalnum))
+            {
+                     if (token_value == "return") tokens.emplace_back(token_type::return_);
+                else if (token_value == "let")    tokens.emplace_back(token_type::let_);
+                else if (token_value == "if")     tokens.emplace_back(token_type::if_);
+                else tokens.emplace_back(token_type::identifier_, token_value);
+            }
+            else if (try_consume_token_char(c, '(')) tokens.emplace_back(token_type::open_parenthesis_);
+            else if (try_consume_token_char(c, ')')) tokens.emplace_back(token_type::close_parenthesis_);
+            else if (try_consume_token_char(c, '{')) tokens.emplace_back(token_type::open_brace_);
+            else if (try_consume_token_char(c, '}')) tokens.emplace_back(token_type::close_brace_);
+            else if (try_consume_token_char(c, '[')) tokens.emplace_back(token_type::open_bracket_);
+            else if (try_consume_token_char(c, ']')) tokens.emplace_back(token_type::close_bracket_);
+            else if (try_consume_token_char(c, ';')) tokens.emplace_back(token_type::semicolon_);
+            else if (try_consume_token_char(c, '=')) tokens.emplace_back(token_type::equals_);
+
+            else if (try_consume_token_char(c, '/')) tokens.emplace_back(token_type::forward_slash_);
+            else if (try_consume_token_char(c, '%')) tokens.emplace_back(token_type::percent_);
+            else if (try_consume_token_char(c, '*')) tokens.emplace_back(token_type::asterisk_);
+            else if (try_consume_token_char(c, '+')) tokens.emplace_back(token_type::plus_);
+            else if (try_consume_token_char(c, '-')) tokens.emplace_back(token_type::minus_);
+
             else error_exit("Invalid character.");
         }
 
@@ -41,12 +43,12 @@ namespace shl
         return tokens;
     }
 
-    std::optional<std::string_view> tokenizer::try_consume_token_value(std::optional<char>& c, const token_pred first_pred, const token_pred rest_pred)
+    std::optional<std::string_view> tokenizer::try_consume_token_value(std::optional<char>& c, token_pred first_pred, token_pred rest_pred)
     {
         if (!first_pred(*c))
             return std::nullopt;
 
-        const auto token_begin_it = iterator();
+        auto token_begin_it = iterator();
         consume();
         auto token_end_it = iterator();
 
@@ -62,12 +64,12 @@ namespace shl
         return std::string_view(token_begin_it, token_end_it);
     }
 
-    std::optional<std::string_view> tokenizer::try_consume_token_char(std::optional<char>& c, const char wanted)
+    std::optional<std::string_view> tokenizer::try_consume_token_char(std::optional<char>& c, char wanted)
     {
         if (*c != wanted)
             return std::nullopt;
 
-        const auto token_begin_it = iterator();
+        auto token_begin_it = iterator();
         consume();
         return std::string_view(token_begin_it, iterator());
     }

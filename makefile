@@ -52,6 +52,16 @@ $(DIRS):
 run: $(EXE)
 	$(MAKE) -C $(TEST_DIR) run
 
+# Clears the terminal.
+.PHONY: clear
+clear:
+	clear
+
+# Clears the terminal and recompiles everything.
+# If successful, also runs the test.
+.PHONY: crun
+crun: clean clear run
+
 # Debugs the test.
 .PHONY: rund
 rund: $(EXE)

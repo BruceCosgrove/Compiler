@@ -10,7 +10,7 @@ namespace shl
     class generator
     {
     public:
-        [[nodiscard]] inline explicit generator(const node_program* const root) : _root(root) {}
+        [[nodiscard]] inline explicit generator(const node_program* root) : _root(root) {}
 
         [[nodiscard]] std::string operator()();
 
@@ -18,14 +18,14 @@ namespace shl
         // Correspondence: Single-case grammar rule.
 
         void generate_program();
-        void generate_scope(const node_scope* const node);
+        void generate_scope(const node_scope* node);
 
         // Correspondence: Multi-case grammar rule.
 
-        void generate_statement(const node_statement* const node);
-        void generate_expression(const node_expression* const node);
-        void generate_term(const node_term* const node);
-        void generate_binary_operator(const node_binary_operator* const node);
+        void generate_statement(const node_statement* node);
+        void generate_expression(const node_expression* node);
+        void generate_term(const node_term* node);
+        void generate_binary_operator(const node_binary_operator* node);
 
     private:
         [[nodiscard]] std::stringstream& output();
@@ -45,7 +45,7 @@ namespace shl
         };
 
     private:
-        [[nodiscard]] std::vector<variable>::iterator get_variable_iterator(const std::string_view name);
+        [[nodiscard]] std::vector<variable>::iterator get_variable_iterator(std::string_view name);
 
         const node_program* const _root;
         std::stringstream _output;

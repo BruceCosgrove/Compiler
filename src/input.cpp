@@ -6,7 +6,7 @@
 namespace shl
 {
     // Util function.
-    std::string after_each(std::string_view string, char after)
+    std::string insert_after_each(std::string_view string, char after)
     {
         std::string result;
         result.reserve(string.size() * 2);
@@ -20,7 +20,7 @@ namespace shl
     void handle_input(int argc, char *argv[])
     {
         // All options that require an argument.
-        static const std::string opts_r = after_each("o", ':');
+        static const std::string opts_r = insert_after_each("o", ':');
         // All options that have no arguments.
         static const std::string opts = "v";
         // The full option string.
