@@ -46,9 +46,9 @@ namespace shl
                 g.output() << "syscall\n";
             }
 
-            void operator()(const node_declare_identifier* node) const
+            void operator()(const node_declare_variable* node) const
             {
-                IF_VERBOSE g._output << "declare_identifier\n";
+                IF_VERBOSE g._output << "declare_variable\n";
                 std::string_view name = node->n_identifier->value;
                 if (g.get_variable_iterator(name) != g._variables.end())
                     error_exit("Redeclared identifier.");

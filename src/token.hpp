@@ -17,6 +17,7 @@ namespace shl
         close_brace_,       // }
         open_bracket_,      // [
         close_bracket_,     // ]
+        colon_,             // :
         semicolon_,         // ;
         equals_,            // =
 

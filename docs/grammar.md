@@ -5,40 +5,33 @@ $$
     \text{[declaration]} &\to
     \begin{cases}
         \text{[definition]} \\
-        \text{[variable\_declarations]} \\
-        \text{[function\_declaration]} \\
+        \text{[declare\_variable]} \\
     \end{cases} \\
 
     \text{[definition]} &\to
     \begin{cases}
-        \text{[variable\_definition]} \\
-        \text{[function\_definition]} \\
+        \text{[define\_variable]} \\
+        \text{[define\_function]} \\
     \end{cases} \\
 
-    \text{[variable\_declarations]} &\to let\space\text{[identifier]}(,let\space\text{[identifier]})? \\
+    \text{[declare\_variable]} &\to\space:let \\
 
-    \text{[variable\_definitions]} &\to let\space\text{[identifier]}=\text{[expression]}(,let\space\text{[identifier]}=\text{[expression]})? \\
+    \text{[define\_variable]} &\to\space:let=\text{[expression]} \\
 
-    \text{[function\_declaration]} &\to
+    \text{[parameter]} &\to \text{[parameter\_pass]}?\space\text{[identifier]}:let \\
+
+    \text{[define\_function]} &\to
     \begin{cases}
-        function\space\text{[identifier]}(\text{[variable\_declarations]?;?})? \\
-        function\space\text{[identifier]}\text{([variable\_declarations]?;[variable\_declarations])} \\
+        :\text{([variable\_declarations]?;?)}\text{[statement]} \\
+        :\text{([variable\_declarations]?;[variable\_declarations])}\text{[statement]} \\
     \end{cases} \\
-
-    \text{[function\_definition]} &\to
-    \begin{cases}
-        function\space\text{[identifier]}(\text{[variable\_declarations]?;?})?\text{[statement]} \\
-        function\space\text{[identifier]}\text{([variable\_declarations]?;[variable\_declarations])}\text{[statement]} \\
-    \end{cases} \\
-
-    \text{[alias]} &\to alias\space\text{[identifier]}=\text{[identifier]}\\
 
     \text{[scope]} &\to \{\text{[scoped\_statement]}^*\} \\
 
     \text{[scoped\_statement]} &\to
     \begin{cases}
         \text{[statement]} \\
-        \text{[declaration]}; \\
+        \text{[identifier]}\text{[declaration]}; \\
         if\space\text{[expression]}\text{[statement]} \\
     \end{cases} \\
 
@@ -68,6 +61,15 @@ $$
         \text{*} & \text{precedence 1} \\
         \text{+} & \text{precedence 0} \\
         \text{-} & \text{precedence 0} \\
+    \end{cases} \\
+
+    \text{[parameter\_pass]} &\to
+    \begin{cases}
+        in & \text{default} \\
+        out \\
+        inout \\
+        copy \\
+        move \\
     \end{cases} \\
 
     \text{[integer\_literal]} &\to [0-9]^* \\

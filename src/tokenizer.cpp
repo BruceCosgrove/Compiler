@@ -33,6 +33,7 @@ namespace shl
             else if (try_consume_token('}')) tokens.emplace_back(token_type::close_brace_);
             else if (try_consume_token('[')) tokens.emplace_back(token_type::open_bracket_);
             else if (try_consume_token(']')) tokens.emplace_back(token_type::close_bracket_);
+            else if (try_consume_token(':')) tokens.emplace_back(token_type::colon_);
             else if (try_consume_token(';')) tokens.emplace_back(token_type::semicolon_);
             else if (try_consume_token('=')) tokens.emplace_back(token_type::equals_);
 

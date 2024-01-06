@@ -28,7 +28,7 @@ namespace shl
     // Correspondence: Non-trivial grammar rule case.
 
     struct node_return;
-    struct node_declare_identifier;
+    struct node_declare_variable;
     struct node_if;
     struct node_binary_expression;
     struct node_parenthesised_expression;
@@ -63,7 +63,7 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_scope*, node_return*, node_declare_identifier*, node_if*> n_value;
+        std::variant<node_scope*, node_return*, node_declare_variable*, node_if*> n_value;
     };
 
     struct node_expression
@@ -98,7 +98,7 @@ namespace shl
         node_expression* n_expression;
     };
 
-    struct node_declare_identifier
+    struct node_declare_variable
     {
         node_identifier* n_identifier;
         node_expression* n_expression;

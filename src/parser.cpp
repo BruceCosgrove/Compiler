@@ -40,8 +40,8 @@ namespace shl
             return _allocator.allocate<node_statement>(n_scope);
         if (auto n_return = try_parse_return())
             return _allocator.allocate<node_statement>(n_return);
-        if (auto n_declare_identifier = try_parse_declare_identifier())
-            return _allocator.allocate<node_statement>(n_declare_identifier);
+        if (auto n_declare_variable = try_parse_declare_variable())
+            return _allocator.allocate<node_statement>(n_declare_variable);
         if (auto n_if = try_parse_if())
             return _allocator.allocate<node_statement>(n_if);
         return nullptr;
@@ -117,18 +117,18 @@ namespace shl
         return nullptr;
     }
 
-    node_declare_identifier* parser::try_parse_declare_identifier()
+    node_declare_variable* parser::try_parse_declare_variable()
     {
-        if (try_consume(token_type::let_))
+        if (auto n_identifier = try_parse_identifier())
         {
-            auto n_declare_identifier = _allocator.allocate<node_declare_identifier>();
-            if (auto n_identifier = try_parse(&parser::try_parse_identifier, "Expected identifier."))
-                n_declare_identifier->n_identifier = n_identifier;
+            auto n_declare_variable = _allocator.allocate<node_declare_variable>(n_identifier);
+            try_consume(token_type::colon_, "Expected ':'.");
+            // if (auto t_type = try_consume(token_type::let_));
             try_consume(token_type::equals_, "Expected '='.");
             if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
-                n_declare_identifier->n_expression = n_expression;
+                n_declare_variable->n_expression = n_expression;
             try_consume(token_type::semicolon_, "Expected ';'.");
-            return n_declare_identifier;
+            return n_declare_variable;
         }
         return nullptr;
     }

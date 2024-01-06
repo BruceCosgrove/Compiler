@@ -34,7 +34,7 @@ namespace shl
         // Correspondence: Non-trivial grammar rule case.
 
         [[nodiscard]] node_return* try_parse_return();
-        [[nodiscard]] node_declare_identifier* try_parse_declare_identifier();
+        [[nodiscard]] node_declare_variable* try_parse_declare_variable();
         [[nodiscard]] node_if* try_parse_if();
 
         // Correspondence: Trivial grammar rule.
