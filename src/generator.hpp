@@ -7,10 +7,10 @@
 
 namespace shl
 {
-    class generator
+    class generator // Making this a consumer turned out to be too much overhead.
     {
     public:
-        [[nodiscard]] inline explicit generator(node_program*&& root) : _root(std::move(root)) {}
+        [[nodiscard]] inline explicit generator(node_program* root) : _root(root) {}
 
         [[nodiscard]] std::string operator()();
 
@@ -47,7 +47,7 @@ namespace shl
     private:
         [[nodiscard]] std::vector<variable>::iterator get_variable_iterator(std::string_view name);
 
-        const node_program* const _root;
+        const node_program* _root;
         std::stringstream _output;
         std::size_t _indent_level = 1;
         std::ptrdiff_t _stack_location = 0;
