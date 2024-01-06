@@ -38,37 +38,23 @@ namespace shl
         ~consumer() noexcept = default;
 
     protected:
-        // If the container has a value at iterator() + offset, returns said value.
+        // If the container has a value at std::next(iterator(), offset), returns said value.
         // Otherwise, returns nothing.
-        [[nodiscard]] std::optional<value_type> peek(difference_type offset = 0) const noexcept
+        [[nodiscard]] std::optional<value_type> peek(size_type offset = 0) const noexcept
         {
-            if constexpr (std::contiguous_iterator<const_iterator>)
-            {
-                const_iterator it = std::next(_it, offset);
-                if (_container.begin() <= it && it < _container.end())
-                    return *it;
-            }
-            else
-            {
-                const_iterator it = _it;
-                if (offset)
-                {
-                    difference_type direction = offset > 0 ? 1 : -1;
-                    while (it != _container.end())
-                        std::advance(it, direction);
-                }
-                if (it != _container.end())
-                    return *it;
-            }
+            size_type max_offset = std::distance(_it, _container.end());
+            if (offset < max_offset)
+                return *std::next(_it, offset);
             return std::nullopt;
         }
 
-        // Return the value at the current iterator and advances the iterator.
-        // Handles out of bounds checks by terminating, so only call this
-        // if you know you have a value, i.e. use peek() to check.
-        value_type consume()
+        // Returns the current iterator and advances _it.
+        // Call peek() first to see if the advance is valid.
+        const_iterator consume(size_type advance = 1)
         {
-            return *_it++;
+            const_iterator it = _it;
+            std::advance(_it, advance);
+            return it;
         }
 
         // Returns the current iterator.

@@ -164,14 +164,14 @@ namespace shl
     std::optional<token> parser::try_consume(token_type type)
     {
         if (auto t = peek(); t && t->type == type)
-            return consume();
+            return *consume();
         return std::nullopt;
     }
 
     token parser::try_consume(token_type type, std::string_view error_message)
     {
         if (auto t = peek(); t && t->type == type)
-            return consume();
+            return *consume();
         error_exit(error_message);
     }
 } // namespace shl

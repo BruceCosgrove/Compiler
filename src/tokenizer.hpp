@@ -17,8 +17,14 @@ namespace shl
         [[nodiscard]] std::vector<token> operator()();
 
     private:
-        using token_pred = int(*)(int);
-        [[nodiscard]] std::optional<std::string_view> try_consume_token_value(std::optional<char>& c, token_pred first_pred, token_pred rest_pred);
-        [[nodiscard]] std::optional<std::string_view> try_consume_token_char(std::optional<char>& c, char wanted);
+        [[nodiscard]] bool try_consume_whitespace_and_comments();
+        [[nodiscard]] std::optional<std::string_view> try_consume_integer_literal();
+        [[nodiscard]] std::optional<std::string_view> try_consume_identifier();
+
+        using token_pred = bool(*)(char);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token(token_pred first_pred, token_pred rest_pred);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token(token_pred char_pred);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token(std::string_view wanted);
+        [[nodiscard]] std::optional<std::string_view> try_consume_token(char wanted);
     };
 } // namespace shl

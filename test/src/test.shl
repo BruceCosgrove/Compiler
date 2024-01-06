@@ -1,7 +1,7 @@
-let a = 5 * (15 + (25 - 2 - 20) * 4 * 3) / 2;
+let a = 5 * (15 + (25 - 2 - 20) * 4 * 3) / 2; // hello world
 {
     let b = 2;
-    let c = 3;
+    let c = 3; /*
     let d = 4;
     let e = 5;
     if a {
@@ -9,7 +9,8 @@ let a = 5 * (15 + (25 - 2 - 20) * 4 * 3) / 2;
         let g = 7;
         let h = 8;
         return h - f;
-    }
+    } */
 }
 let b = 7 * 9;
 return a % 8 + b;
+//test
