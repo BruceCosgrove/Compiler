@@ -11,7 +11,7 @@ namespace shl
         bool verbose = false;
     };
 
-    void handle_input(int argc, char* argv[]);
+    const input& handle_input(int argc, char* argv[]);
 
     const input& get_input() noexcept;
 } // namespace shl

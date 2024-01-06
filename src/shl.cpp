@@ -9,15 +9,17 @@ using namespace shl;
 
 int main(int argc, char* argv[])
 {
-    handle_input(argc, argv);
-    auto& input = get_input();
+    auto& input = handle_input(argc, argv);
 
     // Read the input file.
     std::string in_file_contents;
     if (!fileio::read(input.in_path, in_file_contents))
         error_exit("Unable to open input file.");
 
-    auto assembly = generator(parser(tokenizer(std::move(in_file_contents))())())();
+    tokenizer tokenizer(std::move(in_file_contents));
+    parser parser(tokenizer());
+    generator generator(parser());
+    auto assembly = generator();
 
     // Write the output file.
     if (!fileio::write(input.out_path, assembly))

@@ -17,7 +17,7 @@ namespace shl
 
     static input _input;
 
-    void handle_input(int argc, char *argv[])
+    const input& handle_input(int argc, char *argv[])
     {
         // All options that require an argument.
         static const std::string opts_r = insert_after_each("o", ':');
@@ -49,6 +49,8 @@ namespace shl
             _input.out_path = _input.in_path;
             _input.out_path.replace_extension("asm");
         }
+
+        return _input;
     }
 
     const input& get_input() noexcept

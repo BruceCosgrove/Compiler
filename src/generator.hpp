@@ -10,7 +10,7 @@ namespace shl
     class generator
     {
     public:
-        [[nodiscard]] inline explicit generator(const node_program* root) : _root(root) {}
+        [[nodiscard]] inline explicit generator(node_program*&& root) : _root(std::move(root)) {}
 
         [[nodiscard]] std::string operator()();
 
