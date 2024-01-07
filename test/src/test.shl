@@ -1,5 +1,10 @@
-x := 7 + 9 - (2 + 4);
-if x {
-    return x - 3;
+
+main: (status: let; argc: let, argv: let) = {
+    status = 64;
 }
-return 42;
+
+foo: (x: let, y: let; a: let, b: let, c: let) = {
+    z: let = 42;
+    x = a / z + b;
+    y = b - c * z;
+}

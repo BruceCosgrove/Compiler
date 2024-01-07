@@ -35,6 +35,7 @@ namespace shl
             else if (try_consume_token(']')) tokens.emplace_back(token_type::close_bracket_);
             else if (try_consume_token(':')) tokens.emplace_back(token_type::colon_);
             else if (try_consume_token(';')) tokens.emplace_back(token_type::semicolon_);
+            else if (try_consume_token(',')) tokens.emplace_back(token_type::comma_);
             else if (try_consume_token('=')) tokens.emplace_back(token_type::equals_);
 
             else if (try_consume_token('/')) tokens.emplace_back(token_type::forward_slash_);

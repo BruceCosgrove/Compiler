@@ -14,10 +14,108 @@ namespace shl
     {
         auto n_program = _allocator.allocate<node_program>();
         while (peek())
-            if (auto n_statement = try_parse(&parser::try_parse_statement, "Invalid statement."))
-                n_program->statements.push_back(n_statement);
-        if (!n_program->statements.empty())
+            if (auto n_declaration = try_parse(&parser::try_parse_declaration, "Invalid declaration."))
+                n_program->declarations.push_back(n_declaration);
+        if (!n_program->declarations.empty())
             return n_program;
+        return nullptr;
+    }
+
+    node_declaration* parser::try_parse_declaration()
+    {
+        if (auto n_identifier = try_parse_identifier())
+        {
+            auto n_declaration = _allocator.allocate<node_declaration>();
+            try_consume(token_type::colon_, "Expected ':'.");
+            if (try_consume(token_type::let_))
+            {
+                if (try_consume(token_type::equals_))
+                {
+                    if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                        n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_variable>(n_identifier, n_expression));
+                }
+                else
+                    n_declaration->n_value = _allocator.allocate<node_declare_variable>(n_identifier);
+                try_consume(token_type::semicolon_, "Expected ';'.");
+                return n_declaration;
+            }
+            else if (auto n_function = try_parse_function(true))
+            {
+                n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_named_function>(n_identifier, n_function));
+                return n_declaration;
+            }
+            else
+                error_exit("Ill-formed declaration.");
+        }
+        return nullptr;
+    }
+
+    node_declare_variable* parser::try_parse_declare_variable()
+    {
+        if (auto n_identifier = try_parse_identifier())
+        {
+            try_consume(token_type::colon_, "Expected ':'.");
+            try_consume(token_type::let_, "Expected \"let\".");
+            return _allocator.allocate<node_declare_variable>(n_identifier);
+        }
+        return nullptr;
+    }
+
+    node_function* parser::try_parse_function(bool colon_consumed)
+    {
+        if (colon_consumed || try_consume(token_type::colon_))
+        {
+            // An opening parenthesis means there's a function definition.
+            if (try_consume(token_type::open_parenthesis_))
+            {
+                auto n_function = _allocator.allocate<node_function>();
+                // Parse any return variables.
+                if (auto n_declare_variable = try_parse_declare_variable())
+                {
+                    n_function->return_values.push_back(n_declare_variable);
+                    while (try_consume(token_type::comma_))
+                    {
+                        n_declare_variable = try_parse(&parser::try_parse_declare_variable, "Expected return value declaration.");
+                        n_function->return_values.push_back(n_declare_variable);
+                    }
+                }
+                if (try_consume(token_type::semicolon_))
+                {
+                    // Parse any parameters.
+                    if (auto n_parameter = try_parse_parameter())
+                    {
+                        n_function->parameters.push_back(n_parameter);
+                        while (try_consume(token_type::comma_))
+                        {
+                            n_parameter = try_parse(&parser::try_parse_parameter, "Expected parameter.");
+                            n_function->parameters.push_back(n_parameter);
+                        }
+                    }
+                }
+                // Consume the closing parenthesis and equal sign.
+                try_consume(token_type::close_parenthesis_, "Expected ')'.");
+                try_consume(token_type::equals_, "Expected '='.");
+                // Parse the statement.
+                n_function->n_statement = try_parse(&parser::try_parse_statement, "Expected statement.");
+                return n_function;
+            }
+        }
+        return nullptr;
+    }
+
+    node_parameter* parser::try_parse_parameter()
+    {
+        auto n_parameter_pass = try_parse_parameter_pass();
+        if (auto n_identifier = try_parse_identifier())
+        {
+            if (!n_parameter_pass) // Default parameter passing is in.
+                n_parameter_pass = _allocator.allocate<node_parameter_pass>(node_in());
+            try_consume(token_type::colon_, "Expected ':'.");
+            try_consume(token_type::let_, "Expected \"let\".");
+            return _allocator.allocate<node_parameter>(n_parameter_pass, n_identifier);
+        }
+        else if (n_parameter_pass)
+            error_exit("Expected identifier.");
         return nullptr;
     }
 
@@ -26,8 +124,8 @@ namespace shl
         if (try_consume(token_type::open_brace_))
         {
             auto n_scope = _allocator.allocate<node_scope>();
-            while (auto n_statement = try_parse_statement())
-                n_scope->statements.push_back(n_statement);
+            while (auto n_scoped_statement = try_parse_scoped_statement())
+                n_scope->scoped_statements.push_back(n_scoped_statement);
             try_consume(token_type::close_brace_, "Expected '}'.");
             return n_scope;
         }
@@ -36,14 +134,25 @@ namespace shl
 
     node_statement* parser::try_parse_statement()
     {
+        if (auto n_reassign = try_parse_reassign())
+            return _allocator.allocate<node_statement>(n_reassign);
         if (auto n_scope = try_parse_scope())
             return _allocator.allocate<node_statement>(n_scope);
         if (auto n_return = try_parse_return())
             return _allocator.allocate<node_statement>(n_return);
-        if (auto n_declare_variable = try_parse_declare_variable())
-            return _allocator.allocate<node_statement>(n_declare_variable);
         if (auto n_if = try_parse_if())
             return _allocator.allocate<node_statement>(n_if);
+        return nullptr;
+    }
+
+    node_scoped_statement* parser::try_parse_scoped_statement()
+    {
+        if (auto n_statement = try_parse_statement())
+            return _allocator.allocate<node_scoped_statement>(n_statement);
+        if (auto n_declaration = try_parse_declaration())
+            return _allocator.allocate<node_scoped_statement>(n_declaration);
+        if (auto n_if = try_parse_if())
+            return _allocator.allocate<node_scoped_statement>(n_if);
         return nullptr;
     }
 
@@ -61,10 +170,13 @@ namespace shl
             if (!precedence || precedence < min_precedence) break;
             auto next_min_precedence = *precedence + 1;
 
+            // TODO: Unary operators.
+            // node_unary_expression
             auto n_binary_expression = _allocator.allocate<node_binary_expression>(); // create parent
             n_binary_expression->n_expression_lhs = n_expression; // set left
-            n_binary_expression->n_binary_operator = _allocator.allocate<node_binary_operator>(); // set operator
+            n_binary_expression->n_binary_operator = _allocator.allocate<node_binary_operator>(); // set binary operator
 
+            // TODO: Unary operators.
             if (auto n_binary_operator = try_parse_binary_operator())
                 n_binary_expression->n_binary_operator = n_binary_operator;
 
@@ -94,42 +206,31 @@ namespace shl
 
     node_binary_operator* parser::try_parse_binary_operator()
     {
-        if (try_consume(token_type::forward_slash_)) return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_forward_slash>());
-        if (try_consume(token_type::percent_))       return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_percent>());
+        if (try_consume(token_type::forward_slash_)) return _allocator.allocate<node_binary_operator>(node_forward_slash(token_type::forward_slash_));
+        if (try_consume(token_type::percent_))       return _allocator.allocate<node_binary_operator>(node_percent(token_type::percent_));
 
-        if (try_consume(token_type::asterisk_))      return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_asterisk>());
-        if (try_consume(token_type::plus_))          return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_plus>());
-        if (try_consume(token_type::minus_))         return _allocator.allocate<node_binary_operator>(_allocator.allocate<node_minus>());
+        if (try_consume(token_type::asterisk_))      return _allocator.allocate<node_binary_operator>(node_asterisk(token_type::asterisk_));
+        if (try_consume(token_type::plus_))          return _allocator.allocate<node_binary_operator>(node_plus(token_type::plus_));
+        if (try_consume(token_type::minus_))         return _allocator.allocate<node_binary_operator>(node_minus(token_type::minus_));
 
+        // if (try_consume(token_type::tilde_))         return _allocator.allocate<node_unary_operator>(node_tilde_(token_type::tilde_));
+        return nullptr;
+    }
+
+    node_parameter_pass* parser::try_parse_parameter_pass()
+    {
+        if (try_consume(token_type::in_))    return _allocator.allocate<node_parameter_pass>(node_in());
+        if (try_consume(token_type::out_))   return _allocator.allocate<node_parameter_pass>(node_out());
+        if (try_consume(token_type::inout_)) return _allocator.allocate<node_parameter_pass>(node_inout());
+        if (try_consume(token_type::copy_))  return _allocator.allocate<node_parameter_pass>(node_copy());
+        if (try_consume(token_type::move_))  return _allocator.allocate<node_parameter_pass>(node_move());
         return nullptr;
     }
 
     node_return* parser::try_parse_return()
     {
         if (try_consume(token_type::return_))
-        {
-            auto n_return = _allocator.allocate<node_return>();
-            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
-                n_return->n_expression = n_expression;
-            try_consume(token_type::semicolon_, "Expected ';'.");
-            return n_return;
-        }
-        return nullptr;
-    }
-
-    node_declare_variable* parser::try_parse_declare_variable()
-    {
-        if (auto n_identifier = try_parse_identifier())
-        {
-            auto n_declare_variable = _allocator.allocate<node_declare_variable>(n_identifier);
-            try_consume(token_type::colon_, "Expected ':'.");
-            // if (auto t_type = try_consume(token_type::let_));
-            try_consume(token_type::equals_, "Expected '='.");
-            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
-                n_declare_variable->n_expression = n_expression;
-            try_consume(token_type::semicolon_, "Expected ';'.");
-            return n_declare_variable;
-        }
+            return _allocator.allocate<node_return>();
         return nullptr;
     }
 
@@ -140,9 +241,26 @@ namespace shl
             auto n_if = _allocator.allocate<node_if>();
             if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
                 n_if->n_expression = n_expression;
-            if (auto n_scope = try_parse(&parser::try_parse_scope, "Expected scope."))
-                n_if->n_scope = n_scope;
+            if (auto n_statement = try_parse(&parser::try_parse_statement, "Expected statement."))
+                n_if->n_statement = n_statement;
             return n_if;
+        }
+        return nullptr;
+    }
+
+    node_reassign* parser::try_parse_reassign()
+    {
+        if (peek(1) && peek(1)->type == token_type::equals_)
+        {
+            if (auto n_identifier = try_parse_identifier())
+            {
+                auto n_reassign = _allocator.allocate<node_reassign>(n_identifier);
+                try_consume(token_type::equals_, "Expected '='.");
+                if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                    n_reassign->n_expression = n_expression;
+                try_consume(token_type::semicolon_, "Expected ';'.");
+                return n_reassign;
+            }
         }
         return nullptr;
     }

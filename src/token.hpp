@@ -19,6 +19,7 @@ namespace shl
         close_bracket_,     // ]
         colon_,             // :
         semicolon_,         // ;
+        comma_,             // ,
         equals_,            // =
 
         // Correspondence: Trivial grammar rule.
@@ -46,6 +47,14 @@ namespace shl
         // Correspondence: Unary-only operators
 
         // _tilde, // unary: bitwise not
+
+        // Correspondence: Parameter passing.
+
+        in_,
+        out_,
+        inout_,
+        copy_,
+        move_,
 
         // Internals.
         _count,

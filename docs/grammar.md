@@ -5,46 +5,52 @@ $$
     \text{[declaration]} &\to
     \begin{cases}
         \text{[definition]} \\
-        \text{[declare\_variable]} \\
+        \text{[declare\_variable]}; \\
     \end{cases} \\
 
     \text{[definition]} &\to
     \begin{cases}
-        \text{[define\_variable]} \\
-        \text{[define\_function]} \\
+        \text{[define\_variable]}; \\
+        \text{[named\_function]}; \\
     \end{cases} \\
 
-    \text{[declare\_variable]} &\to\space:let \\
+    \text{[declare\_variable]} &\to \text{[identifier]}:let \\
 
-    \text{[define\_variable]} &\to\space:let=\text{[expression]} \\
+    \text{[define\_variable]} &\to \text{[identifier]}:let=\text{[expression]} \\
+
+    \text{[function]} &\to
+    \begin{cases}
+        :\text{([declare\_variable]}^*\text{;}?\text{)[statement]} \\
+        :\text{([declare\_variable]}^*\text{;[parameter]}^+\text{)[statement]} \\
+    \end{cases} \\
+
+    \text{[named\_function]} &\to \text{[identifier]}\text{[function]}\\
 
     \text{[parameter]} &\to \text{[parameter\_pass]}?\space\text{[identifier]}:let \\
 
-    \text{[define\_function]} &\to
-    \begin{cases}
-        :\text{([variable\_declarations]?;?)}\text{[statement]} \\
-        :\text{([variable\_declarations]?;[variable\_declarations])}\text{[statement]} \\
-    \end{cases} \\
-
     \text{[scope]} &\to \{\text{[scoped\_statement]}^*\} \\
-
-    \text{[scoped\_statement]} &\to
-    \begin{cases}
-        \text{[statement]} \\
-        \text{[identifier]}\text{[declaration]}; \\
-        if\space\text{[expression]}\text{[statement]} \\
-    \end{cases} \\
 
     \text{[statement]} &\to
     \begin{cases}
         \text{[scope]} \\
         return\space\text{[expression]}; \\
+        \text{[if]} \\
+        \text{[identifier]}=\text{[expression]}; \\
     \end{cases} \\
+
+    \text{[scoped\_statement]} &\to
+    \begin{cases}
+        \text{[statement]} \\
+        \text{[declaration]} \\
+        \text{[if]} \\
+    \end{cases} \\
+
+    \text{[if]} &\to if\space\text{[expression]}\text{[statement]} \\
 
     \text{[expression]} &\to
     \begin{cases}
         \text{[term]} \\
-        \text{[expression]}\text{[binary\_operator]}\text{[expression]} \\
+        \text{[expression]}\text{[operator]}\text{[expression]} \\
     \end{cases} \\
 
     \text{[term]} &\to
@@ -54,7 +60,7 @@ $$
         \text{([expression])} \\
     \end{cases} \\
 
-    \text{[binary\_operator]} &\to
+    \text{[operator]} &\to
     \begin{cases}
         \text{/} & \text{precedence 1} \\
         \text{\%} & \text{precedence 1} \\
