@@ -26,9 +26,9 @@ namespace shl
         void generate_scoped_statement(std::stringstream& out, const node_scoped_statement* node);
         void generate_expression(std::stringstream& out, const node_expression* node, std::string_view reg = "rax");
         void generate_term(std::stringstream& out, const node_term* node, std::string_view reg = "rax");
-        void generate_binary_operator(std::stringstream& out, const node_binary_operator* node);
+        void generate_binary_operator(std::stringstream& out, const node_binary_operator* node, std::string_view reg1 = "rax", std::string_view reg2 = "rbx");
 
-        void generate_if(std::stringstream& out, const node_if* node);
+        void generate_if(std::stringstream& out, const node_if* node, std::string_view reg = "rax");
     private:
         [[nodiscard]] std::stringstream& output(std::stringstream& out, bool indent = true);
         [[nodiscard]] std::stringstream& push(std::stringstream& out);
@@ -48,7 +48,7 @@ namespace shl
         template <typename visitor, typename... types, typename... Args>
         void visit(std::stringstream& out, std::string_view name, const std::variant<types...>& variant, Args&&... args)
         {
-            IF_VERBOSE output(out) << "; " << name << ": ";
+            IF_VERBOSE(2) output(out) << "; " << name << ": ";
             ++_indent_level;
             std::visit(visitor(*this, out, std::forward<Args>(args)...), variant);
             --_indent_level;

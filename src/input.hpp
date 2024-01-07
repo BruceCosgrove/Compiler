@@ -8,7 +8,7 @@ namespace shl
     {
         std::filesystem::path in_path;
         std::filesystem::path out_path;
-        bool verbose = false;
+        std::uint8_t verbose_level = 0;
     };
 
     const input& handle_input(int argc, char* argv[]);
@@ -16,4 +16,4 @@ namespace shl
     const input& get_input() noexcept;
 } // namespace shl
 
-#define IF_VERBOSE if (::shl::get_input().verbose)
+#define IF_VERBOSE(level) if (::shl::get_input().verbose_level >= (level))

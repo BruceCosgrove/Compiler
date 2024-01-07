@@ -23,7 +23,7 @@ EXE := $(OUT_DIR)$(OUT_NAME)
 # The compiler to use.
 COMPILER := ../bin/shl
 # The whole compilation command.
-COMPILE := $(COMPILER) $(SRC) -o $(ASM)
+COMPILE := $(COMPILER) $(SRC) -o $(ASM) -v1
 
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)

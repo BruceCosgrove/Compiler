@@ -20,11 +20,11 @@ namespace shl
     const input& handle_input(int argc, char *argv[])
     {
         // All options that require an argument.
-        static const std::string opts_r = insert_after_each("o", ':');
+        static const std::string opts_r = insert_after_each("ov", ':');
         // All options that have no arguments.
-        static const std::string opts = "v";
+        static const std::string opts_n = "";
         // The full option string.
-        static const std::string opts_all = opts_r + opts;
+        static const std::string opts_all = opts_r + opts_n;
 
         for (int c; (c = getopt(argc, argv, opts_all.c_str())) != -1; )
         {
@@ -34,7 +34,7 @@ namespace shl
                     _input.out_path = optarg;
                     break;
                 case 'v':
-                    _input.verbose = true;
+                    _input.verbose_level = static_cast<std::uint8_t>(std::atoi(optarg));
                     break;
             }
         }
