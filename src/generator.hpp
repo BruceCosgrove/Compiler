@@ -82,6 +82,21 @@ namespace shl
     private:
         void generate_start();
 
+        // Move-appends source to destination, then returns destination for convenience.
+        static std::stringstream& output_stream(std::stringstream& destination, std::stringstream& source);
+        // Sets the current output to the new output and returns a reference to the old output.
+        // Pass that reference back to this function to undo after you're done outputting.
+        // The return value from the second call may be completely ignored.
+        std::stringstream& exchange_current_output(std::stringstream& new_output);
+
+        template <typename Func>
+        void with_output(std::stringstream& output, const Func& func)
+        {
+            auto& output_backup = exchange_current_output(output);
+            func();
+            exchange_current_output(output_backup);
+        }
+
     private:
         // Input
 
@@ -89,10 +104,12 @@ namespace shl
 
         // Output
 
-        std::stringstream _output_data;
-        std::stringstream _output_text;
-        std::stringstream _output_start; // Not a code segment, just used to order assembly.
-        std::stringstream* _output_current = &_output_text; // Points to different existing streams.
+        // Code segments
+        std::stringstream _output_data, _output_text;
+        // Not code segments, just used to order assembly.
+        std::stringstream _output_start, _output_static_construct, _output_static_destruct;
+        // Points to different existing streams.
+        std::stringstream* _output_current = &_output_text;
         // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
         std::size_t _indent_level = 1;
 

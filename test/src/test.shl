@@ -1,11 +1,12 @@
 
+barbar: let = 50;
+barfoo: let = 100;
+foobar: let = 150;
+foofoo: let = 200;
+
 main: (status: let; argc: let, argv: let) = {
-    if 0
-        status = 3;
-    elif 0
-        status = 4;
-    else
-        status = 5;
+    barbar = foofoo;
+    status = barbar;
 }
 
 bar: (ret: let; condition: let) = {

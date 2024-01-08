@@ -57,28 +57,33 @@ namespace shl
         void operator()(const node_declare_object* node)
         {
             VERBOSE_OUT(2, "declare object\n", true);
-            assert(false && "declare object unimplemented.");
+            g.allocate_object(node->n_name->value);
         }
 
         void operator()(const node_define_object* node)
         {
             VERBOSE_OUT(2, "define object\n", true);
-            std::string_view name = node->n_name->value;
-            auto& object = g.allocate_object(name);
-            if (object.in_function())
+            auto& object = g.allocate_object(node->n_name->value);
+
+            auto define = [&]
             {
                 g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
                 g.output() << "mov [" << object.get_address() << "], rax";
-                VERBOSE_COMMENT(1, node->n_name->value, true) << '\n';
-            }
+                if (object.in_function())
+                    VERBOSE_COMMENT(1, node->n_name->value, true);
+                g.output(false) << '\n';
+            };
+
+            if (object.in_function())
+                define();
             else
-                assert(false && "define static object unimplemented.");
+                g.with_output(g._output_static_construct, define);
         }
 
         void operator()(const node_function* node)
         {
             VERBOSE_OUT(2, "function\n", true);
-            assert(false && "function unimplemented.");
+            assert(false && "unnamed function unimplemented.");
         }
 
         void operator()(const node_named_function* node)
@@ -87,11 +92,10 @@ namespace shl
 
             std::string signature = g.get_function_signature(node);
             if (g.get_function_from_signature(signature)) error_exit("Redefined function.");
-            auto& function = g._functions.emplace_back(node->n_name->value, std::move(signature));
 
-            // Make the function output to its own stream.
-            std::stringstream* output_previous = std::exchange(g._output_current, &function.output);
-            std::ptrdiff_t previous_function_index = std::exchange(g._current_function_index, static_cast<std::ptrdiff_t>(g._functions.size() - 1));
+            auto previous_function_index = std::exchange(g._current_function_index, static_cast<std::ptrdiff_t>(g._functions.size()));
+            auto& function = g._functions.emplace_back(node->n_name->value, std::move(signature));
+            auto& output_previous = g.exchange_current_output(function.output);
 
             std::ptrdiff_t return_value_count = node->n_function->return_values.size();
             std::ptrdiff_t parameter_count = node->n_function->parameters.size();
@@ -101,6 +105,7 @@ namespace shl
             function.return_values.reserve(return_value_count);
             for (auto n_return_value : node->n_function->return_values)
                 function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
+
             // Convert the parameters.
             function.parameters.reserve(parameter_count);
             for (auto n_parameter : node->n_function->parameters)
@@ -113,8 +118,8 @@ namespace shl
             g.pop() << "rbp\n";
             g.output() << "ret\n";
 
-            // Restore the old stream.
-            std::swap(g._output_current, output_previous);
+            // Restore the state.
+            g.exchange_current_output(output_previous);
             std::swap(g._current_function_index, previous_function_index);
         }
 
@@ -183,14 +188,11 @@ namespace shl
             auto object = g.get_object(node->n_identifier->value);
             if (!object) error_exit("Undefined object.");
 
+            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            g.output() << "mov [" << object->get_address() << "], rax";
             if (object->in_function())
-            {
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
-                g.output() << "mov [" << object->get_address() << "], rax";
-                VERBOSE_COMMENT(1, node->n_identifier->value, true) << '\n';
-            }
-            else
-                assert(false && "reassign static object unimplemented.");
+                VERBOSE_COMMENT(1, node->n_identifier->value, true);
+            g.output(false) << '\n';
         }
 
         void operator()(const node_scoped_if* node)
@@ -236,9 +238,9 @@ namespace shl
 
             if (!expand_lhs && !expand_rhs) // both are leaves
             {
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
-                g.output() << "mov rbx, rax\n";
                 g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.output() << "mov rbx, rax\n";
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
                 g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
             }
             else if (!expand_lhs) // lhs is a leaf, but rhs is not
@@ -289,15 +291,12 @@ namespace shl
             VERBOSE_OUT(2, "identifier\n", true);
 
             auto object = g.get_object(node->value);
-            if (!object) error_exit("Undefined object.");
+            if (!object) error_exit("Undeclared identifier.");
 
+            g.output() << "mov rax, QWORD [" << object->get_address() << "]";
             if (object->in_function())
-            {
-                g.output() << "mov rax, QWORD [" << object->get_address() << "]";
-                VERBOSE_COMMENT(1, node->value, true) << '\n';
-            }
-            else
-                assert(false && "identifier static object unimplemented.");
+                VERBOSE_COMMENT(1, node->value, true);
+            g.output(false) << '\n';
         }
 
         void operator()(const node_forward_slash& node)
@@ -369,13 +368,16 @@ namespace shl
 
         // Output text.
         for (auto& function : _functions)
-            _output_text << '\n' << function.output.rdbuf();
+            output_stream(_output_text, function.output) << '\n';
 
         // Combine everything.
         std::stringstream output;
-        if (_output_data.rdbuf()->in_avail())
-            output << "section .data\n\n" << std::move(_output_data).rdbuf() << '\n';
-        output << "section .text\n\n" << std::move(_output_start).rdbuf() << '\n' << std::move(_output_text).rdbuf() << '\n';
+        output << "section .data\n\n";
+        IF_VERBOSE(1) output << "; Allocate static objects.\n";
+        output_stream(output, _output_data) << '\n';
+        output << "section .text\n\n";
+        output_stream(output, _output_text) << '\n';
+        output_stream(output, _output_start);
         return std::move(output).str();
     }
 
@@ -421,19 +423,20 @@ namespace shl
 
     void generator::begin_scope()
     {
+        assert(has_current_function());
         _scopes.push_back(get_current_function().objects.size());
     }
 
     void generator::end_scope()
     {
+        assert(has_current_function());
         auto& objects = get_current_function().objects;
-        std::size_t pop_count = objects.size() - _scopes.back();
-        if (pop_count > 0)
+        if (std::size_t pop_count = objects.size() - _scopes.back())
         {
             output() << "add rsp, " << (pop_count * elem_size) << '\n';
             _stack_pointer -= pop_count;
-            objects.erase(objects.end() - pop_count, objects.end());
             // TODO: call destructors in reverse order.
+            objects.erase(objects.end() - pop_count, objects.end());
         }
         _scopes.pop_back();
     }
@@ -560,18 +563,16 @@ namespace shl
 
         // Generate start.
 
-        _output_current = &_output_start;
+        auto& output_backup = exchange_current_output(_output_start);
         output(false) << "global _start\n_start:\n";
 
         if (!_static_objects.empty())
         {
-            push() << "rdi\n";
-            push() << "rsi\n";
-            // TODO: call constructors of all static objects.
-            pop() << "rsi\n";
-            pop() << "rdi\n";
+            IF_VERBOSE(1) output() << "; Construct static objects.\n";
+            output_stream(*_output_current, _output_static_construct);
         }
 
+        IF_VERBOSE(1) output() << "; Call entrypoint.\n";
         push() << '0'; VERBOSE_COMMENT(1, "status") << '\n';
         output() << "mov rbp, rsp\n";
 
@@ -585,14 +586,28 @@ namespace shl
 
         if (!_static_objects.empty())
         {
-            push() << "rbp\n";
-            // TODO: call destructors in reverse order of all static objects.
-            pop() << "rbp\n";
+            IF_VERBOSE(1) output() << "; Destruct static objects.\n";
+            output_stream(*_output_current, _output_static_destruct);
         }
 
+        IF_VERBOSE(1) output() << "; Exit with return code [rbp].\n";
         output() << "mov rax, 60\n";
         output() << "mov rdi, [rbp]\n";
         output() << "syscall\n";
+
+        exchange_current_output(output_backup);
+    }
+
+    std::stringstream& generator::output_stream(std::stringstream& destination, std::stringstream& source)
+    {
+        if (source.rdbuf()->in_avail() > 0)
+            destination << std::move(source).rdbuf();
+        return destination;
+    }
+
+    std::stringstream& generator::exchange_current_output(std::stringstream& new_output)
+    {
+        return *std::exchange(_output_current, &new_output);
     }
 
     std::string generator::object::get_address() const
