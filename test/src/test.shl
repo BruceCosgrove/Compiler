@@ -1,8 +1,10 @@
 
 main: (status: let; argc: let, argv: let) = {
-    x: let = 2;
-    y: let = 3;
-    status = x + 64 + y;
+    a: let = 5;
+    b: let = 2;
+    c: let = 7;
+    z: let = 6;
+    status = (a / z + b) + (b - c * z);
 }
 
 

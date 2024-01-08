@@ -1,10 +1,8 @@
 #include "generator.hpp"
 #include "error.hpp"
 #include <algorithm>
+#include <iostream>  // DEBUG
 #include <sstream>
-// DEBUG
-#include <cassert>
-#include <iostream>
 
 // sections:
 //  data: initializes read/write memory.
@@ -93,9 +91,9 @@ namespace shl
                 IF_VERBOSE(2) g.output(out, false) << "define variable\n";
                 std::string_view name = node->n_name->value;
                 auto& variable = g.allocate_variable(out, name);
-                g.generate_expression(out, node->n_expression);
+                g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
                 g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
-                g.output_verbose_name(out, node->n_name->value);
+                g.output_verbose_name(out, node->n_name->value) << '\n';
             }
 
             void operator()(const node_named_function* node) const
@@ -140,9 +138,9 @@ namespace shl
                 if (it == g.get_current_function().variables.end())
                     error_exit("Undefined variable.");
 
-                g.generate_expression(out, node->n_expression);
+                g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
                 g.output(out) << "mov [" << g.stack_frame_offset(it->stack_offset) << "], rax";
-                g.output_verbose_name(out, node->n_identifier->value);
+                g.output_verbose_name(out, node->n_identifier->value) << '\n';
             }
 
             generator& g;
@@ -179,39 +177,65 @@ namespace shl
         visit<visitor>(out, "scoped statement", node->n_value);
     }
 
-    void generator::generate_expression(std::stringstream& out, const node_expression* node, std::string_view reg)
+    void generator::generate_expression(std::stringstream& out, const node_expression* node)
     {
         struct visitor
         {
             void operator()(const node_term* node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "term\n";
-                g.generate_term(out, node, reg);
+                g.generate_term(out, node);
             }
 
             void operator()(const node_binary_expression* node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "binary_expression\n";
-                g.generate_expression(out, node->n_expression_lhs, "rax");
-                g.generate_expression(out, node->n_expression_rhs, "rbx");
-                g.generate_binary_operator(out, node->n_binary_operator, "rax", "rbx");
+
+                bool expand_lhs = std::holds_alternative<node_binary_expression*>(node->n_expression_lhs->n_value) ||
+                    std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
+                bool expand_rhs = std::holds_alternative<node_binary_expression*>(node->n_expression_rhs->n_value) ||
+                    std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
+
+                if (!expand_lhs && !expand_rhs) // both are leaves
+                {
+                    g.generate_expression(out, node->n_expression_rhs);
+                    g.output(out) << "mov rbx, rax\n";
+                    g.generate_expression(out, node->n_expression_lhs);
+                    g.generate_binary_operator(out, node->n_binary_operator);
+                }
+                else if (!expand_lhs) // lhs is a leaf, but rhs is not
+                {
+                    g.generate_expression(out, node->n_expression_rhs); // compute rhs first
+                    g.push(out) << "rax\n";
+                    g.generate_expression(out, node->n_expression_lhs);
+                    g.pop(out) << "rbx\n";
+                    g.generate_binary_operator(out, node->n_binary_operator);
+                }
+                else
+                {
+                    g.generate_expression(out, node->n_expression_lhs);
+                    g.push(out) << "rax\n";
+                    g.generate_expression(out, node->n_expression_rhs);
+                    g.output(out) << "mov rbx, rax\n";
+                    g.pop(out) << "rax\n";
+                    g.generate_binary_operator(out, node->n_binary_operator);
+                }
             }
 
             generator& g;
             std::stringstream& out;
-            std::string_view reg;
         };
-        visit<visitor>(out, "expression", node->n_value, reg);
+        visit<visitor>(out, "expression", node->n_value);
     }
 
-    void generator::generate_term(std::stringstream& out, const node_term* node, std::string_view reg)
+    void generator::generate_term(std::stringstream& out, const node_term* node)
     {
         struct visitor
         {
             void operator()(const node_integer_literal* node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "integer_literal\n";
-                g.output(out) << "mov " << reg << ", " << node->value << '\n';
+                g.output(out) << "mov rax, " << node->value << '\n';
             }
 
             void operator()(const node_identifier* node) const
@@ -222,74 +246,68 @@ namespace shl
                 if (it == g.get_current_function().variables.end())
                     error_exit("Undefined variable.");
 
-                g.output(out) << "mov " << reg << ", QWORD [" << g.stack_frame_offset(it->stack_offset) << "]";
-                g.output_verbose_name(out, node->value);
+                g.output(out) << "mov rax, QWORD [" << g.stack_frame_offset(it->stack_offset) << "]";
+                g.output_verbose_name(out, node->value) << '\n';
             }
 
             void operator()(const node_parenthesised_expression* node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "parenthesised expression\n";
-                g.generate_expression(out, node->n_expression, reg);
+                g.generate_expression(out, node->n_expression);
             }
 
             generator& g;
             std::stringstream& out;
-            std::string_view reg;
         };
-        visit<visitor>(out, "term", node->n_value, reg);
+        visit<visitor>(out, "term", node->n_value);
     }
 
-    void generator::generate_binary_operator(std::stringstream& out, const node_binary_operator *node, std::string_view reg1, std::string_view reg2)
+    void generator::generate_binary_operator(std::stringstream& out, const node_binary_operator *node)
     {
         struct visitor
         {
             void operator()(const node_forward_slash& node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "/\n";
-                if (reg1 != "rax") error_exit("Binary operator/ doesn't support a first argument other than rax.");
-                g.output(out) << "div " << reg2 << '\n';
+                g.output(out) << "div rbx\n";
             }
 
             void operator()(const node_percent& node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "%\n";
-                if (reg1 != "rax") error_exit("Binary operator% doesn't support a first argument other than rax.");
-                g.output(out) << "div " << reg2 << '\n';
-                g.output(out) << "mov " << reg1 << ", rdx\n"; // div puts reg1 % reg2 in rdx
+                g.output(out) << "div rbx\n";
+                g.output(out) << "mov rax, rdx\n"; // div puts reg1 % reg2 in rdx
             }
 
             void operator()(const node_asterisk& node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "*\n";
-                if (reg1 != "rax") error_exit("Binary operator* doesn't support a first argument other than rax.");
-                g.output(out) << "mul " << reg2 << '\n';
+                g.output(out) << "mul rbx\n";
             }
 
             void operator()(const node_plus& node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "+\n";
-                g.output(out) << "add " << reg1 << ", " << reg2 << '\n';
+                g.output(out) << "add rax, rbx\n";
             }
 
             void operator()(const node_minus& node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "-\n";
-                g.output(out) << "sub " << reg1 << ", " << reg2 << '\n';
+                g.output(out) << "sub rax, rbx\n";
             }
 
             generator& g;
             std::stringstream& out;
-            std::string_view reg1;
-            std::string_view reg2;
         };
-        visit<visitor>(out, "binary operator", node->n_value, reg1, reg2);
+        visit<visitor>(out, "binary operator", node->n_value);
     }
 
-    void generator::generate_if(std::stringstream& out, const node_if* node, std::string_view reg)
+    void generator::generate_if(std::stringstream& out, const node_if* node)
     {
         generate_expression(out, node->n_expression);
         std::string label_end_if = create_label();
-        output(out) << "test " << reg << ", " << reg << '\n';
+        output(out) << "test rax, rax";
         output(out) << "jz " << label_end_if << '\n';
         generate_statement(out, node->n_statement);
         output_label(out, label_end_if);
@@ -341,10 +359,10 @@ namespace shl
         return out;
     }
 
-    void generator::output_verbose_name(std::stringstream& out, std::string_view name)
+    std::stringstream& generator::output_verbose_name(std::stringstream& out, std::string_view name)
     {
         IF_VERBOSE(1) output(out, false) << " ; " << name;
-        output(out, false) << '\n';
+        return out;
     }
 
     std::string generator::stack_frame_offset(std::ptrdiff_t offset)
@@ -391,13 +409,13 @@ namespace shl
             error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
 
         output(out, false) << "global _start\n_start:\n";
-        push(out) << '0'; output_verbose_name(out, "status");
+        push(out) << '0'; output_verbose_name(out, "status") << '\n';
         output(out) << "mov rbp, rsp\n";
 
         if (entry_point.parameters.size() == 2)
         {
-            push(out) << "rdi"; output_verbose_name(out, "argc");
-            push(out) << "rsi"; output_verbose_name(out, "argv");
+            push(out) << "rdi"; output_verbose_name(out, "argc") << '\n';
+            push(out) << "rsi"; output_verbose_name(out, "argv") << '\n';
         }
 
         output(out) << "call " << entry_point.signature << '\n';

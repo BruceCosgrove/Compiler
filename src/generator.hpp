@@ -2,6 +2,7 @@
 
 #include "input.hpp"
 #include "token_nodes.hpp"
+#include <cassert> // DEBUG
 #include <sstream>
 #include <string>
 #include <vector>
@@ -24,18 +25,17 @@ namespace shl
         void generate_scope(std::stringstream& out, const node_scope* node);
         void generate_statement(std::stringstream& out, const node_statement* node);
         void generate_scoped_statement(std::stringstream& out, const node_scoped_statement* node);
-        void generate_expression(std::stringstream& out, const node_expression* node, std::string_view reg = "rax");
-        void generate_term(std::stringstream& out, const node_term* node, std::string_view reg = "rax");
-        void generate_binary_operator(std::stringstream& out, const node_binary_operator* node, std::string_view reg1 = "rax", std::string_view reg2 = "rbx");
+        void generate_expression(std::stringstream& out, const node_expression* node);
+        void generate_term(std::stringstream& out, const node_term* node);
+        void generate_binary_operator(std::stringstream& out, const node_binary_operator* node);
 
-        void generate_if(std::stringstream& out, const node_if* node, std::string_view reg = "rax");
+        void generate_if(std::stringstream& out, const node_if* node);
     private:
         [[nodiscard]] std::stringstream& output(std::stringstream& out, bool indent = true);
         [[nodiscard]] std::stringstream& push(std::stringstream& out);
         [[nodiscard]] std::stringstream& pop(std::stringstream& out);
+        [[nodiscard]] std::stringstream& output_verbose_name(std::stringstream& out, std::string_view name);
         std::stringstream& output_label(std::stringstream& out, std::string_view label);
-
-        void output_verbose_name(std::stringstream& out, std::string_view name);
 
         [[nodiscard]] std::string stack_frame_offset(std::ptrdiff_t offset);
 
@@ -105,5 +105,21 @@ namespace shl
 
     private:
         static constexpr std::ptrdiff_t elem_size = sizeof(std::uint64_t);
+
+        static constexpr std::uint8_t reg_rax_index = 0;
+        static constexpr std::uint8_t reg_rbx_index = 1;
+        static constexpr std::uint8_t reg_rcx_index = 2;
+        static constexpr std::uint8_t reg_rdx_index = 3;
+        static constexpr std::string_view reg_rax = "rax";
+        static constexpr std::string_view reg_rbx = "rbx";
+        static constexpr std::string_view reg_rcx = "rcx";
+        static constexpr std::string_view reg_rdx = "rdx";
+        static constexpr auto registers = std::to_array
+        ({
+            reg_rax,
+            reg_rbx,
+            reg_rcx,
+            reg_rdx,
+        });
     };
 } // namespace shl
