@@ -1,12 +1,9 @@
 
-hmm: let = 46;
-
 main: (status: let; argc: let, argv: let) = {
-    a: let = 5;
-    b: let = 2;
-    c: let = 7;
-    z: let = 6;
-    status = hmm;
+    if status {
+        status = 64;
+    }
+    status = 3;
 }
 
 

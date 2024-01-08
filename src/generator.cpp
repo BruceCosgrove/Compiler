@@ -308,7 +308,7 @@ namespace shl
     {
         generate_expression(out, node->n_expression);
         std::string label_end_if = create_label();
-        output(out) << "test rax, rax";
+        output(out) << "test rax, rax\n";
         output(out) << "jz " << label_end_if << '\n';
         generate_statement(out, node->n_statement);
         output_label(out, label_end_if);
