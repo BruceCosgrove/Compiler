@@ -1,13 +1,13 @@
 
 main: (status: let; argc: let, argv: let) = {
-    // x: let = 2;
-    // y: let = 3;
-    // status = x + 64 + y;
-    status = 69;
+    x: let = 2;
+    y: let = 3;
+    status = x + 64 + y;
 }
 
 
 foo: (x: let, y: let; a: let, b: let, c: let) = {
-    x = a / 2 + b;
-    y = b - c * 2;
+    z: let = 6;
+    x = a / z + b;
+    y = b - c * z;
 }

@@ -37,7 +37,7 @@ namespace shl
 
         void output_verbose_name(std::stringstream& out, std::string_view name);
 
-        [[nodiscard]] std::string stack_offset(std::ptrdiff_t offset, std::string_view reg = "rsp");
+        [[nodiscard]] std::string stack_frame_offset(std::ptrdiff_t offset);
 
         void begin_scope();
         void end_scope(std::stringstream& out);
@@ -104,6 +104,6 @@ namespace shl
         std::uint32_t _label_count = 0;
 
     private:
-        static constexpr std::size_t elem_size = sizeof(std::uint64_t);
+        static constexpr std::ptrdiff_t elem_size = sizeof(std::uint64_t);
     };
 } // namespace shl

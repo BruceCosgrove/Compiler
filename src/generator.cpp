@@ -94,7 +94,7 @@ namespace shl
                 std::string_view name = node->n_name->value;
                 auto& variable = g.allocate_variable(out, name);
                 g.generate_expression(out, node->n_expression);
-                g.output(out) << "mov [" << g.stack_offset(variable.stack_offset) << "], rax";
+                g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
                 g.output_verbose_name(out, node->n_name->value);
             }
 
@@ -141,7 +141,7 @@ namespace shl
                     error_exit("Undefined variable.");
 
                 g.generate_expression(out, node->n_expression);
-                g.output(out) << "mov [" << g.stack_offset(it->stack_offset) << "], rax";
+                g.output(out) << "mov [" << g.stack_frame_offset(it->stack_offset) << "], rax";
                 g.output_verbose_name(out, node->n_identifier->value);
             }
 
@@ -222,7 +222,7 @@ namespace shl
                 if (it == g.get_current_function().variables.end())
                     error_exit("Undefined variable.");
 
-                g.output(out) << "mov " << reg << ", QWORD [" << g.stack_offset(it->stack_offset) << "]";
+                g.output(out) << "mov " << reg << ", QWORD [" << g.stack_frame_offset(it->stack_offset) << "]";
                 g.output_verbose_name(out, node->value);
             }
 
@@ -347,15 +347,15 @@ namespace shl
         output(out, false) << '\n';
     }
 
-    std::string generator::stack_offset(std::ptrdiff_t offset, std::string_view reg)
+    std::string generator::stack_frame_offset(std::ptrdiff_t offset)
     {
-        std::string string(reg);
-        if (std::ptrdiff_t rsp_offset = (_stack_pointer - offset) * elem_size)
+        std::string string = "rbp";
+        if (std::ptrdiff_t rsp_offset = std::abs(offset * elem_size))
         {
             string += ' ';
-            string += (rsp_offset > 0 ? '+' : '-');
+            string += (offset > 0 ? '+' : '-');
             string += ' ';
-            string += std::to_string(rsp_offset > 0 ? rsp_offset : -rsp_offset);
+            string += std::to_string(rsp_offset);
         }
         return string;
     }
@@ -391,22 +391,19 @@ namespace shl
             error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
 
         output(out, false) << "global _start\n_start:\n";
-        push(out) << '0';
-        output_verbose_name(out, "status");
+        push(out) << '0'; output_verbose_name(out, "status");
+        output(out) << "mov rbp, rsp\n";
 
         if (entry_point.parameters.size() == 2)
         {
-            // TODO: allocate/push(argc, argv)
-            push(out) << "rdi";
-            output_verbose_name(out, "argc");
-            push(out) << "rsi";
-            output_verbose_name(out, "argv");
+            push(out) << "rdi"; output_verbose_name(out, "argc");
+            push(out) << "rsi"; output_verbose_name(out, "argv");
         }
 
         output(out) << "call " << entry_point.signature << '\n';
 
         output(out) << "mov rax, 60\n";
-        output(out) << "mov rdi, [" << stack_offset(1) << "]\n";
+        output(out) << "mov rdi, [rbp]\n";
         output(out) << "syscall\n";
     }
 
@@ -473,7 +470,7 @@ namespace shl
         auto& function = get_current_function();
         if (get_variable(function, name) != function.variables.end())
             error_exit("Redefined variable.");
-        auto& variable = function.variables.emplace_back(name, function.variables.size());
+        auto& variable = function.variables.emplace_back(name, -(1 + function.variables.size()));
         ++_stack_pointer;
         output(out) << "sub rsp, " << elem_size << '\n';
         return variable;
@@ -499,19 +496,22 @@ namespace shl
 
         std::ptrdiff_t return_value_count = node->n_function->return_values.size();
         std::ptrdiff_t parameter_count = node->n_function->parameters.size();
-        std::ptrdiff_t stack_offset = -(return_value_count + parameter_count);
+        std::ptrdiff_t stack_offset = return_value_count + parameter_count + 1; // + 1 only if push rbp
 
         // Convert the return values.
         function.return_values.reserve(return_value_count);
         for (auto n_return_value : node->n_function->return_values)
-            function.return_values.emplace_back(n_return_value->n_name->value, stack_offset++);
+            function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
         // Convert the parameters.
         function.parameters.reserve(parameter_count);
         for (auto n_parameter : node->n_function->parameters)
-            function.parameters.emplace_back(n_parameter->n_name->value, stack_offset++);
+            function.parameters.emplace_back(n_parameter->n_name->value, stack_offset--);
 
         output_label(function.output, function.signature);
+        push(function.output) << "rbp\n";
+        output(function.output) << "mov rbp, rsp\n";
         generate_statement(function.output, node->n_function->n_statement);
+        pop(function.output) << "rbp\n";
         output(function.output) << "ret\n";
         return function;
     }
