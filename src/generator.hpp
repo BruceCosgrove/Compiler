@@ -30,11 +30,11 @@ namespace shl
         void generate_binary_operator(std::stringstream& out, const node_binary_operator* node);
 
         void generate_if(std::stringstream& out, const node_if* node);
+        void generate_scoped_if(std::stringstream& out, const node_scoped_if* node);
     private:
         [[nodiscard]] std::stringstream& output(std::stringstream& out, bool indent = true);
         [[nodiscard]] std::stringstream& push(std::stringstream& out);
         [[nodiscard]] std::stringstream& pop(std::stringstream& out);
-        [[nodiscard]] std::stringstream& output_verbose_name(std::stringstream& out, std::string_view name);
         std::stringstream& output_label(std::stringstream& out, std::string_view label);
 
         [[nodiscard]] std::string stack_frame_offset(std::ptrdiff_t offset);
@@ -42,10 +42,11 @@ namespace shl
         void begin_scope();
         void end_scope(std::stringstream& out);
 
-        void generate_start(std::stringstream& out);
-        void call_function(std::stringstream& out, std::string_view signature);
+        void generate_start();
 
-        [[nodiscard]] std::string create_label();
+        // Creates a label string.
+        // As long as short_name is at most 5 characters, this never allocates due to std::string's SSBO.
+        [[nodiscard]] std::string create_label(std::string_view short_name = "label") noexcept;
         [[nodiscard]] std::string get_function_signature(const node_named_function* node);
 
         template <typename visitor, typename... types, typename... Args>
@@ -100,6 +101,7 @@ namespace shl
 
         std::stringstream _output_data;
         std::stringstream _output_text;
+        std::stringstream _output_start; // Not a code segment, just used to order assembly.s
         // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
         std::size_t _indent_level = 1;
 

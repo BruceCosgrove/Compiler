@@ -17,4 +17,5 @@ namespace shl
     const input& get_input() noexcept;
 } // namespace shl
 
-#define IF_VERBOSE(level) if (::shl::get_input().verbose_level >= (level))
+#define IS_VERBOSE(level) (::shl::get_input().verbose_level >= (level))
+#define IF_VERBOSE(level) if (IS_VERBOSE(level))

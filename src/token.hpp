@@ -29,9 +29,11 @@ namespace shl
 
         // Correspondence: Non-trivial grammar rule case.
 
-        return_,
         let_,
+        return_,
         if_,
+        elif_,
+        else_,
 
         // Correspondence: Binary-only operators.
 

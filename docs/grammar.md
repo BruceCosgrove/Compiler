@@ -33,8 +33,7 @@ $$
     \text{[statement]} &\to
     \begin{cases}
         \text{[scope]} \\
-        return\space\text{[expression]}; \\
-        \text{[if]} \\
+        return; \\
         \text{[identifier]}=\text{[expression]}; \\
     \end{cases} \\
 
@@ -42,7 +41,7 @@ $$
     \begin{cases}
         \text{[statement]} \\
         \text{[declaration]} \\
-        \text{[if]} \\
+        \text{[if]}(elif\space\text{[expression]}\text{[statement]})^*(else\space\text{[expression]}\text{[statement]})? \\
     \end{cases} \\
 
     \text{[if]} &\to if\space\text{[expression]}\text{[statement]} \\

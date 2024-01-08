@@ -1,14 +1,27 @@
 
 main: (status: let; argc: let, argv: let) = {
-    if status {
-        status = 64;
-    }
-    status = 3;
+    if 0
+        status = 3;
+    elif 0
+        status = 4;
+    else
+        status = 5;
 }
 
+/*
+bar: (ret: let; condition: let) = {
+    if condition {
+        ret = 64;
+        return;
+    }
+    ret = 42;
+}
+*/
 
+/*
 foo: (x: let, y: let; a: let, b: let, c: let) = {
     z: let = 6;
     x = a / z + b;
     y = b - c * z;
 }
+*/

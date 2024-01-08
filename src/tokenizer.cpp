@@ -15,9 +15,11 @@ namespace shl
                 tokens.emplace_back(token_type::integer_literal_, token_value);
             else if (auto token_value = try_consume_identifier())
             {
-                     if (token_value == "return") tokens.emplace_back(token_type::return_);
-                else if (token_value == "let")    tokens.emplace_back(token_type::let_);
+                     if (token_value == "let")    tokens.emplace_back(token_type::let_);
+                else if (token_value == "return") tokens.emplace_back(token_type::return_);
                 else if (token_value == "if")     tokens.emplace_back(token_type::if_);
+                else if (token_value == "elif")   tokens.emplace_back(token_type::elif_);
+                else if (token_value == "else")   tokens.emplace_back(token_type::else_);
                 else tokens.emplace_back(token_type::identifier_, token_value);
             }
             else if (try_consume_token('(')) tokens.emplace_back(token_type::open_parenthesis_);

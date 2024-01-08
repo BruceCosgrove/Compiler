@@ -23,27 +23,30 @@
 // mov rdi, 1      ; select stdout
 // syscall         ; call the kernel
 
+#define VERBOSE_COMMENT(out, to_append, ...) \
+        (IS_VERBOSE(1) ? static_cast<std::stringstream&>(__VA_OPT__(g.)output((out), false) << " ; " << (to_append)) : (out))
+
 namespace shl
 {
     std::string generator::operator()()
     {
+        // Generate everything.
         generate_program();
+        generate_start();
 
-        // Output initialized data.
-        output(_output_data, false) << "section .data\n\n";
+        // Output data.
         for (auto& static_variable : _static_variables)
             _output_data << static_variable.name << ": dq 0\n";
 
-        // Output code.
-        output(_output_text, false) << "section .text\n\n";
-        generate_start(_output_text);
-
+        // Output text.
         for (auto& function : _functions)
             _output_text << '\n' << function.output.rdbuf();
 
+        // Combine everything.
         std::stringstream output;
-        output << std::move(_output_data).rdbuf() << '\n';
-        output << std::move(_output_text).rdbuf() << '\n';
+        if (_output_data.rdbuf()->in_avail())
+            output << "section .data\n\n" << std::move(_output_data).rdbuf() << '\n';
+        output << "section .text\n\n" << std::move(_output_start).rdbuf() << '\n' << std::move(_output_text).rdbuf() << '\n';
         return std::move(output).str();
     }
 
@@ -93,7 +96,7 @@ namespace shl
                 {
                     g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
                     g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
-                    g.output_verbose_name(out, node->n_name->value) << '\n';
+                    VERBOSE_COMMENT(out, node->n_name->value, true) << '\n';
                 }
                 // else
                     // variable.value = node
@@ -124,13 +127,8 @@ namespace shl
             void operator()(const node_return* node) const
             {
                 IF_VERBOSE(2) g.output(out, false) << "return\n";
+                g.pop(out) << "rbp\n";
                 g.output(out) << "ret\n";
-            }
-
-            void operator()(const node_if* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "if\n";
-                g.generate_if(out, node);
             }
 
             void operator()(const node_reassign* node) const
@@ -142,7 +140,7 @@ namespace shl
 
                 g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
                 g.output(out) << "mov [" << g.stack_frame_offset(variable->stack_offset) << "], rax";
-                g.output_verbose_name(out, node->n_identifier->value) << '\n';
+                VERBOSE_COMMENT(out, node->n_identifier->value, true) << '\n';
             }
 
             generator& g;
@@ -167,10 +165,10 @@ namespace shl
                 g.generate_declaration(out, node);
             }
 
-            void operator()(const node_if* node) const
+            void operator()(const node_scoped_if* node) const
             {
-                IF_VERBOSE(2) g.output(out, false) << "if\n";
-                g.generate_if(out, node);
+                IF_VERBOSE(2) g.output(out, false) << "scoped if\n";
+                g.generate_scoped_if(out, node);
             }
 
             generator& g;
@@ -248,7 +246,7 @@ namespace shl
                 if (!variable) error_exit("Undefined variable.");
 
                 g.output(out) << "mov rax, QWORD [" << g.stack_frame_offset(variable->stack_offset) << "]";
-                g.output_verbose_name(out, node->value) << '\n';
+                VERBOSE_COMMENT(out, node->value, true) << '\n';
             }
 
             void operator()(const node_parenthesised_expression* node) const
@@ -311,7 +309,37 @@ namespace shl
         output(out) << "test rax, rax\n";
         output(out) << "jz " << label_end_if << '\n';
         generate_statement(out, node->n_statement);
+        output_label(out, label_end_if) << '\n';
+    }
+
+    void generator::generate_scoped_if(std::stringstream& out, const node_scoped_if* node)
+    {
+        std::string label_end_if = create_label();
+        std::string label_next_if = node->ifs.size() == 1 ? label_end_if : create_label(); // Copy ok, won't allocate.
+
+        std::size_t i = 0;
+        do
+        {
+            auto n_if = node->ifs[i++];
+            if (n_if->n_expression) // Only else blocks won't enter here.
+            {
+                generate_expression(out, n_if->n_expression);
+                output(out) << "test rax, rax\n";
+                output(out) << "jz " << label_next_if << '\n';
+            }
+            generate_statement(out, n_if->n_statement);
+            if (i < node->ifs.size())
+            {
+                output(out) << "jmp " << label_end_if << '\n';
+                output_label(out, label_next_if);
+                VERBOSE_COMMENT(out, node->ifs[i]->n_expression ? "elif" : "else") << '\n';
+                label_next_if = i + 1 < node->ifs.size() ? create_label() : label_end_if;
+            }
+        }
+        while (i < node->ifs.size());
+
         output_label(out, label_end_if);
+        VERBOSE_COMMENT(out, "endif") << '\n';
     }
 
     void generator::generate_scope(std::stringstream& out, const node_scope* node)
@@ -356,13 +384,7 @@ namespace shl
         IF_VERBOSE(2)
             for (std::size_t i = 0; i < _indent_level - 1; ++i)
                 out << "    ";
-        out << label << ":\n";
-        return out;
-    }
-
-    std::stringstream& generator::output_verbose_name(std::stringstream& out, std::string_view name)
-    {
-        IF_VERBOSE(1) output(out, false) << " ; " << name;
+        out << label << ':';
         return out;
     }
 
@@ -397,7 +419,7 @@ namespace shl
         _scopes.pop_back();
     }
 
-    void generator::generate_start(std::stringstream& out)
+    void generator::generate_start()
     {
         // Verify correct state.
 
@@ -411,35 +433,30 @@ namespace shl
 
         // Generate start.
 
-        output(out, false) << "global _start\n_start:\n";
-        push(out) << '0'; output_verbose_name(out, "status") << '\n';
-        output(out) << "mov rbp, rsp\n";
+        output(_output_start, false) << "global _start\n_start:\n";
+        push(_output_start) << '0'; VERBOSE_COMMENT(_output_start, "status") << '\n';
+        output(_output_start) << "mov rbp, rsp\n";
 
         if (!entry_point->parameters.empty())
         {
-            push(out) << "rdi"; output_verbose_name(out, "argc") << '\n';
-            push(out) << "rsi"; output_verbose_name(out, "argv") << '\n';
+            push(_output_start) << "rdi"; VERBOSE_COMMENT(_output_start, "argc") << '\n';
+            push(_output_start) << "rsi"; VERBOSE_COMMENT(_output_start, "argv") << '\n';
         }
 
-        output(out) << "call " << entry_point->signature << '\n';
+        output(_output_start) << "call " << entry_point->signature << '\n';
 
-        output(out) << "mov rax, 60\n";
-        output(out) << "mov rdi, [rbp]\n";
-        output(out) << "syscall\n";
+        output(_output_start) << "mov rax, 60\n";
+        output(_output_start) << "mov rdi, [rbp]\n";
+        output(_output_start) << "syscall\n";
     }
 
-    void generator::call_function(std::stringstream& out, std::string_view signature)
+    std::string generator::create_label(std::string_view short_name) noexcept
     {
-        auto function = get_function_from_signature(signature);
-        if (!function) error_exit("Unknown function signature.");
-
-
-        output(out) << "call " << function->signature;
-    }
-
-    std::string generator::create_label()
-    {
-        return "label" + std::to_string(_label_count++);
+        // As long as short_name is at most 5 characters:
+        // an upper bound for the number of characters this label will take is:
+        // "5 + ceil(log10(1 << 32)) == 15", which is exactly the capacity of
+        // std::string's SSBO, meaning this will never allocate.
+        return std::string(short_name) + std::to_string(_label_count++);
     }
 
     std::string generator::get_function_signature(const node_named_function* node)
@@ -512,7 +529,7 @@ namespace shl
         for (auto n_parameter : node->n_function->parameters)
             function.parameters.emplace_back(n_parameter->n_name->value, stack_offset--);
 
-        output_label(function.output, function.signature);
+        output_label(function.output, function.signature) << '\n';
         push(function.output) << "rbp\n";
         output(function.output) << "mov rbp, rsp\n";
         generate_statement(function.output, node->n_function->n_statement);

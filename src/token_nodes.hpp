@@ -29,6 +29,7 @@ namespace shl
     struct node_return;
     struct node_if;
     struct node_reassign;
+    struct node_scoped_if;
     struct node_binary_expression;
     struct node_parenthesised_expression;
 
@@ -119,12 +120,12 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_scope*, node_return*, node_if*, node_reassign*> n_value;
+        std::variant<node_scope*, node_return*, node_reassign*> n_value;
     };
 
     struct node_scoped_statement
     {
-        std::variant<node_statement*, node_declaration*, node_if*> n_value;
+        std::variant<node_statement*, node_declaration*, node_scoped_if*> n_value;
     };
 
     struct node_expression
@@ -156,6 +157,11 @@ namespace shl
     {
         node_identifier* n_identifier;
         node_expression* n_expression;
+    };
+
+    struct node_scoped_if
+    {
+        std::vector<node_if*> ifs;
     };
 
     struct node_binary_expression

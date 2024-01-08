@@ -38,8 +38,9 @@ namespace shl
         // Correspondence: Non-trivial grammar rule case.
 
         [[nodiscard]] node_return* try_parse_return();
-        [[nodiscard]] node_if* try_parse_if();
         [[nodiscard]] node_reassign* try_parse_reassign();
+        [[nodiscard]] node_if* try_parse_if(bool if_consumed = false);
+        [[nodiscard]] node_scoped_if* try_parse_scoped_if();
         // [[nodiscard]] node_binary_expression* try_parse_binary_expression();
         // [[nodiscard]] node_parenthesised_expression* try_parse_parenthesised_expression();
 

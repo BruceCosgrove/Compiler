@@ -140,8 +140,6 @@ namespace shl
             return _allocator.allocate<node_statement>(n_scope);
         if (auto n_return = try_parse_return())
             return _allocator.allocate<node_statement>(n_return);
-        if (auto n_if = try_parse_if())
-            return _allocator.allocate<node_statement>(n_if);
         return nullptr;
     }
 
@@ -151,8 +149,8 @@ namespace shl
             return _allocator.allocate<node_scoped_statement>(n_statement);
         if (auto n_declaration = try_parse_declaration())
             return _allocator.allocate<node_scoped_statement>(n_declaration);
-        if (auto n_if = try_parse_if())
-            return _allocator.allocate<node_scoped_statement>(n_if);
+        if (auto n_scoped_if = try_parse_scoped_if())
+            return _allocator.allocate<node_scoped_statement>(n_scoped_if);
         return nullptr;
     }
 
@@ -230,20 +228,9 @@ namespace shl
     node_return* parser::try_parse_return()
     {
         if (try_consume(token_type::return_))
-            return _allocator.allocate<node_return>();
-        return nullptr;
-    }
-
-    node_if* parser::try_parse_if()
-    {
-        if (try_consume(token_type::if_))
         {
-            auto n_if = _allocator.allocate<node_if>();
-            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
-                n_if->n_expression = n_expression;
-            if (auto n_statement = try_parse(&parser::try_parse_statement, "Expected statement."))
-                n_if->n_statement = n_statement;
-            return n_if;
+            try_consume(token_type::semicolon_, "Expected ';'.");
+            return _allocator.allocate<node_return>();
         }
         return nullptr;
     }
@@ -261,6 +248,34 @@ namespace shl
                 try_consume(token_type::semicolon_, "Expected ';'.");
                 return n_reassign;
             }
+        }
+        return nullptr;
+    }
+
+    node_if* parser::try_parse_if(bool if_consumed)
+    {
+        if (if_consumed || try_consume(token_type::if_))
+        {
+            auto n_if = _allocator.allocate<node_if>();
+            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                n_if->n_expression = n_expression;
+            if (auto n_statement = try_parse(&parser::try_parse_statement, "Expected statement."))
+                n_if->n_statement = n_statement;
+            return n_if;
+        }
+        return nullptr;
+    }
+
+    node_scoped_if* parser::try_parse_scoped_if()
+    {
+        if (auto n_if = try_parse_if())
+        {
+            auto n_scoped_if = _allocator.allocate<node_scoped_if>(std::vector{n_if});
+            while (try_consume(token_type::elif_))
+                n_scoped_if->ifs.push_back(try_parse(&parser::try_parse_if, "Expected expression and statement.", true));
+            if (try_consume(token_type::else_))
+                n_scoped_if->ifs.push_back(_allocator.allocate<node_if>(nullptr, try_parse(&parser::try_parse_statement, "Expected statement.")));
+            return n_scoped_if;
         }
         return nullptr;
     }
