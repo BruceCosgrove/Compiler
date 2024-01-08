@@ -7,8 +7,8 @@
 // sections:
 //  data: initializes read/write memory.
 //  bss:
-// _output << "section .data\n";
-// _output << "section .bss\n";
+// _output_data << "section .data\n";
+// _output_data << "section .bss\n";
 
 // NOTE: How to write to stdout:
 // Put the string in the data section (must be before the text section).
@@ -30,29 +30,27 @@ namespace shl
         generate_program();
 
         // Output initialized data.
-        // output(_output, false) << "section .data\n\n";
+        output(_output_data, false) << "section .data\n\n";
+        for (auto& static_variable : _static_variables)
+            _output_data << static_variable.name << ": dq 0\n";
 
         // Output code.
-        output(_output, false) << "section .text\n\n";
-        generate_start(_output);
+        output(_output_text, false) << "section .text\n\n";
+        generate_start(_output_text);
 
         for (auto& function : _functions)
-            _output << '\n' << function.output.rdbuf();
+            _output_text << '\n' << function.output.rdbuf();
 
-        _indent_level = 1;
-        _stack_pointer = 0;
-        _functions.clear();
-        _functions.shrink_to_fit();
-        _scopes.clear();
-        _scopes.shrink_to_fit();
-        _label_count = 0;
-        return std::move(_output).str();
+        std::stringstream output;
+        output << std::move(_output_data).rdbuf() << '\n';
+        output << std::move(_output_text).rdbuf() << '\n';
+        return std::move(output).str();
     }
 
     void generator::generate_program()
     {
         for (auto node : _root->declarations)
-            generate_declaration(_output, node);
+            generate_declaration(_output_text, node);
     }
 
     void generator::generate_declaration(std::stringstream& out, const node_declaration* node)
@@ -91,9 +89,14 @@ namespace shl
                 IF_VERBOSE(2) g.output(out, false) << "define variable\n";
                 std::string_view name = node->n_name->value;
                 auto& variable = g.allocate_variable(out, name);
-                g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
-                g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
-                g.output_verbose_name(out, node->n_name->value) << '\n';
+                if (variable.in_function())
+                {
+                    g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
+                    g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
+                    g.output_verbose_name(out, node->n_name->value) << '\n';
+                }
+                // else
+                    // variable.value = node
             }
 
             void operator()(const node_named_function* node) const
@@ -134,12 +137,11 @@ namespace shl
             {
                 IF_VERBOSE(2) g.output(out, false) << "reassign\n";
 
-                auto it = g.get_variable(g.get_current_function(), node->n_identifier->value);
-                if (it == g.get_current_function().variables.end())
-                    error_exit("Undefined variable.");
+                auto variable = g.get_variable(node->n_identifier->value);
+                if (!variable) error_exit("Undefined variable.");
 
                 g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
-                g.output(out) << "mov [" << g.stack_frame_offset(it->stack_offset) << "], rax";
+                g.output(out) << "mov [" << g.stack_frame_offset(variable->stack_offset) << "], rax";
                 g.output_verbose_name(out, node->n_identifier->value) << '\n';
             }
 
@@ -242,11 +244,10 @@ namespace shl
             {
                 IF_VERBOSE(2) g.output(out, false) << "identifier\n";
 
-                auto it = g.get_variable(g.get_current_function(), node->value);
-                if (it == g.get_current_function().variables.end())
-                    error_exit("Undefined variable.");
+                auto variable = g.get_variable(node->value);
+                if (!variable) error_exit("Undefined variable.");
 
-                g.output(out) << "mov rax, QWORD [" << g.stack_frame_offset(it->stack_offset) << "]";
+                g.output(out) << "mov rax, QWORD [" << g.stack_frame_offset(variable->stack_offset) << "]";
                 g.output_verbose_name(out, node->value) << '\n';
             }
 
@@ -398,63 +399,42 @@ namespace shl
 
     void generator::generate_start(std::stringstream& out)
     {
-        auto it = get_function_from_name(get_input().entry_point);
-        if (it == _functions.end())
-            error_exit("Entry point not defined.");
-        auto& entry_point = *it;
+        // Verify correct state.
 
-        if (entry_point.return_values.size() > 1)
+        auto entry_point = get_function_from_name(get_input().entry_point);
+        if (!entry_point) error_exit("Entry point not defined.");
+
+        if (entry_point->return_values.size() > 1)
             error_exit("Ill-formed entry point. Incorrect return value count. Must be 0 or 1.");
-        if (entry_point.parameters.size() != 2 && !entry_point.parameters.empty())
+        if (entry_point->parameters.size() != 2 && !entry_point->parameters.empty())
             error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
+
+        // Generate start.
 
         output(out, false) << "global _start\n_start:\n";
         push(out) << '0'; output_verbose_name(out, "status") << '\n';
         output(out) << "mov rbp, rsp\n";
 
-        if (entry_point.parameters.size() == 2)
+        if (!entry_point->parameters.empty())
         {
             push(out) << "rdi"; output_verbose_name(out, "argc") << '\n';
             push(out) << "rsi"; output_verbose_name(out, "argv") << '\n';
         }
 
-        output(out) << "call " << entry_point.signature << '\n';
+        output(out) << "call " << entry_point->signature << '\n';
 
         output(out) << "mov rax, 60\n";
         output(out) << "mov rdi, [rbp]\n";
         output(out) << "syscall\n";
     }
 
-    void generator::call_function(std::stringstream& out, std::string_view signature) {
-        auto it = get_function_from_signature(signature);
-        if (it == _functions.end())
-        error_exit("Unknown function signature.");
-        auto &function = *it;
+    void generator::call_function(std::stringstream& out, std::string_view signature)
+    {
+        auto function = get_function_from_signature(signature);
+        if (!function) error_exit("Unknown function signature.");
 
-        // allocate/push all return values
-        // allocate/push all parameters
-        // call name
-        // deallocate/pop all parameters in reverse order
-        // deallocate/pop ignored return values in reverse order
-        // TODO: optimization: if some return values are ignored, deallocate them
-        //  in reverse order of which they are defined, until either one is
-        //  reached that is not ignored, or there are none left. The latter case
-        //  is equivalent to not capturing the return values at all. This
-        //  deallocation stack offset can be added to the sum of the parameters'
-        //  sizes to deallocate all in one go. Remember to also call all their
-        //  destructors.
 
-        for (auto &return_value : function.return_values)
-            allocate_variable(out, return_value.name);
-        for (auto &parameter : function.parameters)
-            allocate_variable(out, parameter.name);
-
-        output(out) << "call " << function.signature;
-
-        for (std::size_t i = 0; i < function.return_values.size(); ++i)
-            deallocate_variable(out);
-        for (std::size_t i = 0; i < function.parameters.size(); ++i)
-            deallocate_variable(out);
+        output(out) << "call " << function->signature;
     }
 
     std::string generator::create_label()
@@ -485,17 +465,23 @@ namespace shl
 
     auto generator::allocate_variable(std::stringstream& out, std::string_view name) -> variable&
     {
-        auto& function = get_current_function();
-        if (get_variable(function, name) != function.variables.end())
+        if (get_variable(name))
             error_exit("Redefined variable.");
-        auto& variable = function.variables.emplace_back(name, -(1 + function.variables.size()));
-        ++_stack_pointer;
-        output(out) << "sub rsp, " << elem_size << '\n';
-        return variable;
+        auto& variables = get_variables();
+        if (has_current_function())
+        {
+            auto& variable = variables.emplace_back(name, -(1 + variables.size()));
+            ++_stack_pointer;
+            output(out) << "sub rsp, " << elem_size << '\n';
+            return variable;
+        }
+        else
+            return _static_variables.emplace_back(name, 0);
     }
 
     void generator::deallocate_variable(std::stringstream& out)
     {
+        assert(has_current_function());
         auto& function = get_current_function();
         function.variables.pop_back();
         --_stack_pointer;
@@ -506,9 +492,10 @@ namespace shl
     {
         std::string signature = get_function_signature(node);
 
-        if (get_function_from_signature(signature) != _functions.end())
+        if (get_function_from_signature(signature))
             error_exit("Redefined function.");
 
+        std::size_t previous_function_index = _current_function_index;
         _current_function_index = _functions.size();
         auto& function = _functions.emplace_back(node->n_name->value, std::move(signature));
 
@@ -531,31 +518,53 @@ namespace shl
         generate_statement(function.output, node->n_function->n_statement);
         pop(function.output) << "rbp\n";
         output(function.output) << "ret\n";
+
+        _current_function_index = previous_function_index;
         return function;
     }
 
-    auto generator::get_variable(function& function, std::string_view name) -> std::vector<variable>::iterator
+    auto generator::get_variable(std::string_view name) -> variable*
     {
         auto check = [=](const variable& variable) { return variable.name == name; };
-        if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) return it;
-        if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) return it;
-        return std::ranges::find_if(function.variables, check);
+        variable* variable = nullptr;
+        if (has_current_function())
+        {
+            auto& function = get_current_function();
+                 if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) variable = it.base();
+            else if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) variable = it.base();
+            else if (auto it = std::ranges::find_if(function.variables, check); it != function.variables.end()) variable = it.base();
+        }
+        if (!variable)
+            if (auto it = std::ranges::find_if(_static_variables, check); it != _static_variables.end()) variable = it.base();
+        return variable;
     }
 
-    auto generator::get_function_from_name(std::string_view name) -> std::vector<function>::iterator
+    auto generator::get_function_from_name(std::string_view name) -> function*
     {
         auto check = [=](const function& function) { return function.name == name; };
-        return std::ranges::find_if(_functions, check);
+        if (auto it = std::ranges::find_if(_functions, check); it != _functions.end()) return it.base();
+        return nullptr;
     }
 
-    auto generator::get_function_from_signature(std::string_view signature) -> std::vector<function>::iterator
+    auto generator::get_function_from_signature(std::string_view signature) -> function*
     {
         auto check = [=](const function& function) { return function.signature == signature; };
-        return std::ranges::find_if(_functions, check);
+        if (auto it = std::ranges::find_if(_functions, check); it != _functions.end()) return it.base();
+        return nullptr;
+    }
+
+    auto generator::get_variables() -> std::vector<variable>&
+    {
+        return has_current_function() ? get_current_function().variables : _static_variables;
     }
 
     auto generator::get_current_function() -> function&
     {
         return _functions[_current_function_index];
+    }
+
+    bool generator::has_current_function() const noexcept
+    {
+        return 0 <= _current_function_index;
     }
 } // namespace shl

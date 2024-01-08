@@ -61,6 +61,12 @@ namespace shl
         {
             std::string_view name;
             std::ptrdiff_t stack_offset = 0;
+
+            // 0 (and 1 if rbp is pushed), are invalid stack offsets for functions.
+            // 0 is guaranteed to be invalid, but not 1, so 0 is instead used to
+            // say this variable is not inside a function. This may mean it's static/
+            // in the global scope, thread_local, or maybe something else.
+            [[nodiscard]] constexpr bool in_function() const noexcept { return stack_offset != 0; }
         };
 
         struct function
@@ -79,10 +85,12 @@ namespace shl
 
         function& create_function(const node_named_function* node);
 
-        [[nodiscard]] std::vector<variable>::iterator get_variable(function& function, std::string_view name);
-        [[nodiscard]] std::vector<function>::iterator get_function_from_name(std::string_view name);
-        [[nodiscard]] std::vector<function>::iterator get_function_from_signature(std::string_view name);
+        [[nodiscard]] variable* get_variable(std::string_view name);
+        [[nodiscard]] function* get_function_from_name(std::string_view name);
+        [[nodiscard]] function* get_function_from_signature(std::string_view name);
+        [[nodiscard]] inline std::vector<variable>& get_variables();
         [[nodiscard]] inline function& get_current_function();
+        [[nodiscard]] inline bool has_current_function() const noexcept;
 
         // Input
 
@@ -90,7 +98,8 @@ namespace shl
 
         // Output
 
-        std::stringstream _output;
+        std::stringstream _output_data;
+        std::stringstream _output_text;
         // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
         std::size_t _indent_level = 1;
 
@@ -98,28 +107,13 @@ namespace shl
 
         // Increments when rsp decrements, and vice versa.
         std::size_t _stack_pointer = 0;
-        std::size_t _current_function_index = 0;
+        std::ptrdiff_t _current_function_index = -1;
         std::vector<function> _functions;
+        std::vector<variable> _static_variables;
         std::vector<std::size_t> _scopes;
         std::uint32_t _label_count = 0;
 
     private:
         static constexpr std::ptrdiff_t elem_size = sizeof(std::uint64_t);
-
-        static constexpr std::uint8_t reg_rax_index = 0;
-        static constexpr std::uint8_t reg_rbx_index = 1;
-        static constexpr std::uint8_t reg_rcx_index = 2;
-        static constexpr std::uint8_t reg_rdx_index = 3;
-        static constexpr std::string_view reg_rax = "rax";
-        static constexpr std::string_view reg_rbx = "rbx";
-        static constexpr std::string_view reg_rcx = "rcx";
-        static constexpr std::string_view reg_rdx = "rdx";
-        static constexpr auto registers = std::to_array
-        ({
-            reg_rax,
-            reg_rbx,
-            reg_rcx,
-            reg_rdx,
-        });
     };
 } // namespace shl
