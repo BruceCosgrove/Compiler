@@ -360,7 +360,6 @@ namespace shl
     std::string generator::operator()()
     {
         // Generate everything.
-        _output_current = &_output_text;
         generator_visitor(*this)(_root);
         generate_start();
 
@@ -434,6 +433,7 @@ namespace shl
             output() << "add rsp, " << (pop_count * elem_size) << '\n';
             _stack_pointer -= pop_count;
             objects.erase(objects.end() - pop_count, objects.end());
+            // TODO: call destructors in reverse order.
         }
         _scopes.pop_back();
     }
@@ -562,6 +562,16 @@ namespace shl
 
         _output_current = &_output_start;
         output(false) << "global _start\n_start:\n";
+
+        if (!_static_objects.empty())
+        {
+            push() << "rdi\n";
+            push() << "rsi\n";
+            // TODO: call constructors of all static objects.
+            pop() << "rsi\n";
+            pop() << "rdi\n";
+        }
+
         push() << '0'; VERBOSE_COMMENT(1, "status") << '\n';
         output() << "mov rbp, rsp\n";
 
@@ -572,6 +582,13 @@ namespace shl
         }
 
         output() << "call " << entry_point->signature << '\n';
+
+        if (!_static_objects.empty())
+        {
+            push() << "rbp\n";
+            // TODO: call destructors in reverse order of all static objects.
+            pop() << "rbp\n";
+        }
 
         output() << "mov rax, 60\n";
         output() << "mov rdi, [rbp]\n";

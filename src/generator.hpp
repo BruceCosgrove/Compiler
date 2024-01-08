@@ -92,7 +92,7 @@ namespace shl
         std::stringstream _output_data;
         std::stringstream _output_text;
         std::stringstream _output_start; // Not a code segment, just used to order assembly.
-        std::stringstream* _output_current; // Points to different existing streams.
+        std::stringstream* _output_current = &_output_text; // Points to different existing streams.
         // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
         std::size_t _indent_level = 1;
 
@@ -100,10 +100,16 @@ namespace shl
 
         // Increments when rsp decrements, and vice versa.
         std::size_t _stack_pointer = 0;
+        // Index into _functions.
+        // Used to determine which function is currently being generated, if any.
         std::ptrdiff_t _current_function_index = -1;
+        // List of functions generated/being generated thus far.
         std::vector<function> _functions;
+        // List of objects outside any function, aka static objects.
         std::vector<object> _static_objects;
+        // Used to deallocate stack objects.
         std::vector<std::size_t> _scopes;
+        // Used to generate unique labels for generic jumps, like if statements.
         std::uint32_t _label_count = 0;
 
     private:
