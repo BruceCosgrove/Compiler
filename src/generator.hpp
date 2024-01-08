@@ -35,11 +35,14 @@ namespace shl
         [[nodiscard]] std::stringstream& pop(std::stringstream& out);
         std::stringstream& output_label(std::stringstream& out, std::string_view label);
 
-        [[nodiscard]] std::string rsp_offset(std::ptrdiff_t offset);
+        void output_verbose_name(std::stringstream& out, std::string_view name);
+
+        [[nodiscard]] std::string stack_offset(std::ptrdiff_t offset, std::string_view reg = "rsp");
 
         void begin_scope();
         void end_scope(std::stringstream& out);
 
+        void generate_start(std::stringstream& out);
         void call_function(std::stringstream& out, std::string_view signature);
 
         [[nodiscard]] std::string create_label();

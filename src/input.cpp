@@ -1,4 +1,5 @@
 #include "input.hpp"
+#include "ctype.hpp"
 #include "error.hpp"
 #include <iostream>
 #include <getopt.h> // https://linux.die.net/man/3/optarg
@@ -20,7 +21,7 @@ namespace shl
     const input& handle_input(int argc, char *argv[])
     {
         // All options that require an argument.
-        static const std::string opts_r = insert_after_each("ov", ':');
+        static const std::string opts_r = insert_after_each("ove", ':');
         // All options that have no arguments.
         static const std::string opts_n = "";
         // The full option string.
@@ -35,6 +36,14 @@ namespace shl
                     break;
                 case 'v':
                     _input.verbose_level = static_cast<std::uint8_t>(std::atoi(optarg));
+                    break;
+                case 'e':
+                    if (!is_identifier_first(*optarg))
+                        error_exit("Invalid -e argument: it's not an identifier.");
+                    for (std::size_t i = 0; optarg[i]; ++i)
+                        if (!is_identifier_rest(*optarg))
+                            error_exit("Invalid -e argument: it's not an identifier.");
+                    _input.entry_point = optarg;
                     break;
             }
         }

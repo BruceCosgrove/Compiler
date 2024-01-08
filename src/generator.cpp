@@ -36,15 +36,7 @@ namespace shl
 
         // Output code.
         output(_output, false) << "section .text\n\n";
-
-        output(_output, false) << "global _start\n_start:\n";
-        push(_output) << "0\n";
-        // TODO: allocate/push(argc, argv)
-        output(_output) << "call main\n";
-        // TODO: deallocate/pop(argc, argv)
-        output(_output) << "mov rax, 60\n";
-        output(_output) << "mov rdi, [rsp]\n";
-        output(_output) << "syscall\n";
+        generate_start(_output);
 
         for (auto& function : _functions)
             _output << '\n' << function.output.rdbuf();
@@ -102,9 +94,8 @@ namespace shl
                 std::string_view name = node->n_name->value;
                 auto& variable = g.allocate_variable(out, name);
                 g.generate_expression(out, node->n_expression);
-                g.output(out) << "mov [" << g.rsp_offset(variable.stack_offset) << "], rax";
-                IF_VERBOSE(1) g.output(out, false) << " ; " << node->n_name->value;
-                g.output(out, false) << '\n';
+                g.output(out) << "mov [" << g.stack_offset(variable.stack_offset) << "], rax";
+                g.output_verbose_name(out, node->n_name->value);
             }
 
             void operator()(const node_named_function* node) const
@@ -150,9 +141,8 @@ namespace shl
                     error_exit("Undefined variable.");
 
                 g.generate_expression(out, node->n_expression);
-                g.output(out) << "mov [" << g.rsp_offset(it->stack_offset) << "], rax";
-                IF_VERBOSE(1) g.output(out, false) << " ; " << node->n_identifier->value;
-                g.output(out, false) << '\n';
+                g.output(out) << "mov [" << g.stack_offset(it->stack_offset) << "], rax";
+                g.output_verbose_name(out, node->n_identifier->value);
             }
 
             generator& g;
@@ -232,9 +222,8 @@ namespace shl
                 if (it == g.get_current_function().variables.end())
                     error_exit("Undefined variable.");
 
-                g.output(out) << "mov " << reg << ", QWORD [" << g.rsp_offset(it->stack_offset) << "]";
-                IF_VERBOSE(1) g.output(out, false) << " ; " << node->value;
-                g.output(out, false) << '\n';
+                g.output(out) << "mov " << reg << ", QWORD [" << g.stack_offset(it->stack_offset) << "]";
+                g.output_verbose_name(out, node->value);
             }
 
             void operator()(const node_parenthesised_expression* node) const
@@ -352,11 +341,16 @@ namespace shl
         return out;
     }
 
-    std::string generator::rsp_offset(std::ptrdiff_t offset)
+    void generator::output_verbose_name(std::stringstream& out, std::string_view name)
     {
-        std::ptrdiff_t rsp_offset = (_stack_pointer - offset) * elem_size;
-        std::string string = "rsp";
-        if (rsp_offset)
+        IF_VERBOSE(1) output(out, false) << " ; " << name;
+        output(out, false) << '\n';
+    }
+
+    std::string generator::stack_offset(std::ptrdiff_t offset, std::string_view reg)
+    {
+        std::string string(reg);
+        if (std::ptrdiff_t rsp_offset = (_stack_pointer - offset) * elem_size)
         {
             string += ' ';
             string += (rsp_offset > 0 ? '+' : '-');
@@ -384,11 +378,43 @@ namespace shl
         _scopes.pop_back();
     }
 
-    void generator::call_function(std::stringstream& out, std::string_view signature)
+    void generator::generate_start(std::stringstream& out)
     {
+        auto it = get_function_from_name(get_input().entry_point);
+        if (it == _functions.end())
+            error_exit("Entry point not defined.");
+        auto& entry_point = *it;
+
+        if (entry_point.return_values.size() > 1)
+            error_exit("Ill-formed entry point. Incorrect return value count. Must be 0 or 1.");
+        if (entry_point.parameters.size() != 2 && !entry_point.parameters.empty())
+            error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
+
+        output(out, false) << "global _start\n_start:\n";
+        push(out) << '0';
+        output_verbose_name(out, "status");
+
+        if (entry_point.parameters.size() == 2)
+        {
+            // TODO: allocate/push(argc, argv)
+            push(out) << "rdi";
+            output_verbose_name(out, "argc");
+            push(out) << "rsi";
+            output_verbose_name(out, "argv");
+        }
+
+        output(out) << "call " << entry_point.signature << '\n';
+
+        output(out) << "mov rax, 60\n";
+        output(out) << "mov rdi, [" << stack_offset(1) << "]\n";
+        output(out) << "syscall\n";
+    }
+
+    void generator::call_function(std::stringstream& out, std::string_view signature) {
         auto it = get_function_from_signature(signature);
-        if (it == _functions.end()) error_exit("Unknown function signature.");
-        auto& function = *it;
+        if (it == _functions.end())
+        error_exit("Unknown function signature.");
+        auto &function = *it;
 
         // allocate/push all return values
         // allocate/push all parameters
@@ -403,9 +429,9 @@ namespace shl
         //  sizes to deallocate all in one go. Remember to also call all their
         //  destructors.
 
-        for (auto& return_value : function.return_values)
+        for (auto &return_value : function.return_values)
             allocate_variable(out, return_value.name);
-        for (auto& parameter : function.parameters)
+        for (auto &parameter : function.parameters)
             allocate_variable(out, parameter.name);
 
         output(out) << "call " << function.signature;
@@ -423,8 +449,6 @@ namespace shl
 
     std::string generator::get_function_signature(const node_named_function* node)
     {
-        if (node->n_name->value == "main") return "main";
-
         std::stringstream ssignaure;
         ssignaure << node->n_name->value;
 

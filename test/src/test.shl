@@ -1,7 +1,11 @@
 
-main: (status: let) = {
-    status = 64;
+main: (status: let; argc: let, argv: let) = {
+    // x: let = 2;
+    // y: let = 3;
+    // status = x + 64 + y;
+    status = 69;
 }
+
 
 foo: (x: let, y: let; a: let, b: let, c: let) = {
     x = a / 2 + b;
