@@ -1,8 +1,10 @@
 #include "generator.hpp"
 #include "error.hpp"
+#include "util.hpp"
 #include <algorithm>
 #include <iostream>  // DEBUG
 #include <sstream>
+#include <utility>
 
 // sections:
 //  data: initializes read/write memory.
@@ -23,15 +25,343 @@
 // mov rdi, 1      ; select stdout
 // syscall         ; call the kernel
 
-#define VERBOSE_COMMENT(out, to_append, ...) \
-        (IS_VERBOSE(1) ? static_cast<std::stringstream&>(__VA_OPT__(g.)output((out), false) << " ; " << (to_append)) : (out))
+#define VERBOSE_OUT(level, to_output, ...) \
+        (IS_VERBOSE(level) ? static_cast<std::stringstream&>(__VA_OPT__(g.)output(false) << to_output) : (*__VA_OPT__(g.)_output_current))
+
+#define VERBOSE_COMMENT(level, to_output, ...) VERBOSE_OUT((level), " ; " << to_output __VA_OPT__(,) __VA_ARGS__)
 
 namespace shl
 {
+    struct generator_visitor
+    {
+        generator& g; // context
+
+        void operator()(const node_program* node)
+        {
+            for (auto node : node->declarations)
+                g.visit(this, "program", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_declaration* node)
+        {
+            VERBOSE_OUT(2, "declaration\n", true);
+            g.visit(this, "declaration", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_definition* node)
+        {
+            VERBOSE_OUT(2, "definition\n", true);
+            g.visit(this, "definition", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_declare_variable* node)
+        {
+            VERBOSE_OUT(2, "declare variable\n", true);
+            assert(false && "declare variable unimplemented.");
+        }
+
+        void operator()(const node_define_variable* node)
+        {
+            VERBOSE_OUT(2, "define variable\n", true);
+            std::string_view name = node->n_name->value;
+            auto& variable = g.allocate_variable(name);
+            if (variable.in_function())
+            {
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+                g.output() << "mov [" << variable.get_address() << "], rax";
+                VERBOSE_COMMENT(1, node->n_name->value, true) << '\n';
+            }
+            else
+                assert(false && "define static variable unimplemented.");
+        }
+
+        void operator()(const node_function* node)
+        {
+            VERBOSE_OUT(2, "function\n", true);
+            assert(false && "function unimplemented.");
+        }
+
+        void operator()(const node_named_function* node)
+        {
+            VERBOSE_OUT(2, "named function\n", true);
+
+            std::string signature = g.get_function_signature(node);
+            if (g.get_function_from_signature(signature)) error_exit("Redefined function.");
+            auto& function = g._functions.emplace_back(node->n_name->value, std::move(signature));
+
+            // Make the function output to its own stream.
+            std::stringstream* output_previous = std::exchange(g._output_current, &function.output);
+            std::ptrdiff_t previous_function_index = std::exchange(g._current_function_index, static_cast<std::ptrdiff_t>(g._functions.size() - 1));
+
+            std::ptrdiff_t return_value_count = node->n_function->return_values.size();
+            std::ptrdiff_t parameter_count = node->n_function->parameters.size();
+            std::ptrdiff_t stack_offset = return_value_count + parameter_count + 1; // + 1 only if push rbp
+
+            // Convert the return values.
+            function.return_values.reserve(return_value_count);
+            for (auto n_return_value : node->n_function->return_values)
+                function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
+            // Convert the parameters.
+            function.parameters.reserve(parameter_count);
+            for (auto n_parameter : node->n_function->parameters)
+                function.parameters.emplace_back(n_parameter->n_name->value, stack_offset--);
+
+            g.output_label(function.signature) << '\n';
+            g.push() << "rbp\n";
+            g.output() << "mov rbp, rsp\n";
+            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_function->n_statement->n_value));
+            g.pop() << "rbp\n";
+            g.output() << "ret\n";
+
+            // Restore the old stream.
+            std::swap(g._output_current, output_previous);
+            std::swap(g._current_function_index, previous_function_index);
+        }
+
+        void operator()(const node_parameter* node)
+        {
+            VERBOSE_OUT(2, "parameter\n", true);
+            assert(false && "parameter unimplemented.");
+        }
+
+        void operator()(const node_scope* node)
+        {
+            VERBOSE_OUT(2, "scope\n", true);
+            g.begin_scope();
+            for (auto n_scoped_statement : node->scoped_statements)
+                g.visit(this, "scoped statement", cast_variant<NODE_TYPES>(n_scoped_statement->n_value));
+            g.end_scope();
+        }
+
+        void operator()(const node_statement* node)
+        {
+            VERBOSE_OUT(2, "statement\n", true);
+            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_scoped_statement* node)
+        {
+            VERBOSE_OUT(2, "scoped statement\n", true);
+            g.visit(this, "scoped statement", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_expression* node)
+        {
+            VERBOSE_OUT(2, "expression\n", true);
+            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_term* node)
+        {
+            VERBOSE_OUT(2, "term\n", true);
+            g.visit(this, "term", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_return* node)
+        {
+            VERBOSE_OUT(2, "return\n", true);
+            g.pop() << "rbp\n";
+            g.output() << "ret\n";
+        }
+
+        void operator()(const node_if* node)
+        {
+            VERBOSE_OUT(2, "if\n", true);
+            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            std::string label_end_if = g.create_label();
+            g.output() << "test rax, rax\n";
+            g.output() << "jz " << label_end_if << '\n';
+            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_statement->n_value));
+            g.output_label(label_end_if);
+            VERBOSE_COMMENT(1, "endif", true) << '\n';
+        }
+
+        void operator()(const node_reassign* node)
+        {
+            VERBOSE_OUT(2, "reassign\n", true);
+
+            auto variable = g.get_variable(node->n_identifier->value);
+            if (!variable) error_exit("Undefined variable.");
+
+            if (variable->in_function())
+            {
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+                g.output() << "mov [" << variable->get_address() << "], rax";
+                VERBOSE_COMMENT(1, node->n_identifier->value, true) << '\n';
+            }
+            else
+                assert(false && "reassign static variable unimplemented.");
+        }
+
+        void operator()(const node_scoped_if* node)
+        {
+            VERBOSE_OUT(2, "scoped if\n", true);
+
+            std::string label_end_if = g.create_label();
+            std::string label_next_if = node->ifs.size() == 1 ? label_end_if : g.create_label(); // Copy ok, won't allocate.
+
+            std::size_t i = 0;
+            do
+            {
+                auto n_if = node->ifs[i++];
+                if (n_if->n_expression) // Only else blocks won't enter here.
+                {
+                    g.visit(this, "expression", cast_variant<NODE_TYPES>(n_if->n_expression->n_value));
+                    g.output() << "test rax, rax\n";
+                    g.output() << "jz " << label_next_if << '\n';
+                }
+                g.visit(this, "statement", cast_variant<NODE_TYPES>(n_if->n_statement->n_value));
+                if (i < node->ifs.size())
+                {
+                    g.output() << "jmp " << label_end_if << '\n';
+                    g.output_label(label_next_if);
+                    VERBOSE_COMMENT(1, (node->ifs[i]->n_expression ? "elif" : "else"), true) << '\n';
+                    label_next_if = i + 1 < node->ifs.size() ? g.create_label() : label_end_if;
+                }
+            }
+            while (i < node->ifs.size());
+
+            g.output_label(label_end_if);
+            VERBOSE_COMMENT(1, "endif", true) << '\n';
+        }
+
+        void operator()(const node_binary_expression* node)
+        {
+            VERBOSE_OUT(2, "binary expression\n", true);
+
+            bool expand_lhs = std::holds_alternative<node_binary_expression*>(node->n_expression_lhs->n_value) ||
+                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
+            bool expand_rhs = std::holds_alternative<node_binary_expression*>(node->n_expression_rhs->n_value) ||
+                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
+
+            if (!expand_lhs && !expand_rhs) // both are leaves
+            {
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
+                g.output() << "mov rbx, rax\n";
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+            }
+            else if (!expand_lhs) // lhs is a leaf, but rhs is not
+            {
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value)); // compute rhs first
+                g.push() << "rax\n";
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.pop() << "rbx\n";
+                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+            }
+            else
+            {
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.push() << "rax\n";
+                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
+                g.output() << "mov rbx, rax\n";
+                g.pop() << "rax\n";
+                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+            }
+        }
+
+        void operator()(const node_parenthesised_expression* node)
+        {
+            VERBOSE_OUT(2, "parenthesised expression\n", true);
+            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+        }
+
+        void operator()(const node_binary_operator* node)
+        {
+            VERBOSE_OUT(2, "binary operator\n", true);
+            g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_parameter_pass* node)
+        {
+            VERBOSE_OUT(2, "parameter pass\n", true);
+            g.visit(this, "parameter pass", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_integer_literal* node)
+        {
+            VERBOSE_OUT(2, "integer literal\n", true);
+            g.output() << "mov rax, " << node->value << '\n';
+        }
+
+        void operator()(const node_identifier* node)
+        {
+            VERBOSE_OUT(2, "identifier\n", true);
+
+            auto variable = g.get_variable(node->value);
+            if (!variable) error_exit("Undefined variable.");
+
+            if (variable->in_function())
+            {
+                g.output() << "mov rax, QWORD [" << variable->get_address() << "]";
+                VERBOSE_COMMENT(1, node->value, true) << '\n';
+            }
+            else
+                assert(false && "identifier static variable unimplemented.");
+        }
+
+        void operator()(const node_forward_slash& node)
+        {
+            VERBOSE_OUT(2, "/\n", true);
+            g.output() << "div rbx\n";
+        }
+
+        void operator()(const node_percent& node)
+        {
+            VERBOSE_OUT(2, "%\n", true);
+            g.output() << "div rbx\n";
+            g.output() << "mov rax, rdx\n"; // div puts reg1 % reg2 in rdx
+        }
+
+        void operator()(const node_asterisk& node)
+        {
+            VERBOSE_OUT(2, "*\n", true);
+            g.output() << "mul rbx\n";
+        }
+
+        void operator()(const node_plus& node)
+        {
+            VERBOSE_OUT(2, "+\n", true);
+            g.output() << "add rax, rbx\n";
+        }
+
+        void operator()(const node_minus& node)
+        {
+            VERBOSE_OUT(2, "-\n", true);
+            g.output() << "sub rax, rbx\n";
+        }
+
+        void operator()(const node_in& node)
+        {
+            assert(false && "in unimplemented.");
+        }
+
+        void operator()(const node_out& node)
+        {
+            assert(false && "out unimplemented.");
+        }
+
+        void operator()(const node_inout& node)
+        {
+            assert(false && "inout unimplemented.");
+        }
+
+        void operator()(const node_copy& node)
+        {
+            assert(false && "copy unimplemented.");
+        }
+
+        void operator()(const node_move& node)
+        {
+            assert(false && "move unimplemented.");
+        }
+    };
+
     std::string generator::operator()()
     {
         // Generate everything.
-        generate_program();
+        _output_current = &_output_text;
+        generator_visitor(*this)(_root);
         generate_start();
 
         // Output data.
@@ -50,355 +380,44 @@ namespace shl
         return std::move(output).str();
     }
 
-    void generator::generate_program()
-    {
-        for (auto node : _root->declarations)
-            generate_declaration(_output_text, node);
-    }
-
-    void generator::generate_declaration(std::stringstream& out, const node_declaration* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_definition* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "definition\n";
-                g.generate_definition(out, node);
-            }
-
-            void operator()(const node_declare_variable* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "declare variable\n";
-                assert(false && "Not implemented");
-                // std::string_view name = node->n_name->value;
-                // if (g.get_variable_iterator(name) != g._variables.end())
-                //     error_exit("Redeclared identifier.");
-                // g._variables.emplace_back(name, g._stack_pointer);
-                // g.generate_expression(node->n_expression);
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "declaration", node->n_value);
-    }
-
-    void generator::generate_definition(std::stringstream& out, const node_definition* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_define_variable* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "define variable\n";
-                std::string_view name = node->n_name->value;
-                auto& variable = g.allocate_variable(out, name);
-                if (variable.in_function())
-                {
-                    g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
-                    g.output(out) << "mov [" << g.stack_frame_offset(variable.stack_offset) << "], rax";
-                    VERBOSE_COMMENT(out, node->n_name->value, true) << '\n';
-                }
-                // else
-                    // variable.value = node
-            }
-
-            void operator()(const node_named_function* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "named function\n";
-                g.create_function(node);
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "definition", node->n_value);
-    }
-
-    void generator::generate_statement(std::stringstream& out, const node_statement* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_scope* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "scope\n";
-                g.generate_scope(out, node);
-            }
-
-            void operator()(const node_return* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "return\n";
-                g.pop(out) << "rbp\n";
-                g.output(out) << "ret\n";
-            }
-
-            void operator()(const node_reassign* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "reassign\n";
-
-                auto variable = g.get_variable(node->n_identifier->value);
-                if (!variable) error_exit("Undefined variable.");
-
-                g.generate_expression(out, node->n_expression); // TODO: generate into the following stack offset instead of rax.
-                g.output(out) << "mov [" << g.stack_frame_offset(variable->stack_offset) << "], rax";
-                VERBOSE_COMMENT(out, node->n_identifier->value, true) << '\n';
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "statement", node->n_value);
-    }
-
-    void generator::generate_scoped_statement(std::stringstream& out, const node_scoped_statement* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_statement* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "statement\n";
-                g.generate_statement(out, node);
-            }
-
-            void operator()(const node_declaration* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "declaration\n";
-                g.generate_declaration(out, node);
-            }
-
-            void operator()(const node_scoped_if* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "scoped if\n";
-                g.generate_scoped_if(out, node);
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "scoped statement", node->n_value);
-    }
-
-    void generator::generate_expression(std::stringstream& out, const node_expression* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_term* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "term\n";
-                g.generate_term(out, node);
-            }
-
-            void operator()(const node_binary_expression* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "binary_expression\n";
-
-                bool expand_lhs = std::holds_alternative<node_binary_expression*>(node->n_expression_lhs->n_value) ||
-                    std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
-                bool expand_rhs = std::holds_alternative<node_binary_expression*>(node->n_expression_rhs->n_value) ||
-                    std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
-
-                if (!expand_lhs && !expand_rhs) // both are leaves
-                {
-                    g.generate_expression(out, node->n_expression_rhs);
-                    g.output(out) << "mov rbx, rax\n";
-                    g.generate_expression(out, node->n_expression_lhs);
-                    g.generate_binary_operator(out, node->n_binary_operator);
-                }
-                else if (!expand_lhs) // lhs is a leaf, but rhs is not
-                {
-                    g.generate_expression(out, node->n_expression_rhs); // compute rhs first
-                    g.push(out) << "rax\n";
-                    g.generate_expression(out, node->n_expression_lhs);
-                    g.pop(out) << "rbx\n";
-                    g.generate_binary_operator(out, node->n_binary_operator);
-                }
-                else
-                {
-                    g.generate_expression(out, node->n_expression_lhs);
-                    g.push(out) << "rax\n";
-                    g.generate_expression(out, node->n_expression_rhs);
-                    g.output(out) << "mov rbx, rax\n";
-                    g.pop(out) << "rax\n";
-                    g.generate_binary_operator(out, node->n_binary_operator);
-                }
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "expression", node->n_value);
-    }
-
-    void generator::generate_term(std::stringstream& out, const node_term* node)
-    {
-        struct visitor
-        {
-            void operator()(const node_integer_literal* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "integer_literal\n";
-                g.output(out) << "mov rax, " << node->value << '\n';
-            }
-
-            void operator()(const node_identifier* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "identifier\n";
-
-                auto variable = g.get_variable(node->value);
-                if (!variable) error_exit("Undefined variable.");
-
-                g.output(out) << "mov rax, QWORD [" << g.stack_frame_offset(variable->stack_offset) << "]";
-                VERBOSE_COMMENT(out, node->value, true) << '\n';
-            }
-
-            void operator()(const node_parenthesised_expression* node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "parenthesised expression\n";
-                g.generate_expression(out, node->n_expression);
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "term", node->n_value);
-    }
-
-    void generator::generate_binary_operator(std::stringstream& out, const node_binary_operator *node)
-    {
-        struct visitor
-        {
-            void operator()(const node_forward_slash& node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "/\n";
-                g.output(out) << "div rbx\n";
-            }
-
-            void operator()(const node_percent& node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "%\n";
-                g.output(out) << "div rbx\n";
-                g.output(out) << "mov rax, rdx\n"; // div puts reg1 % reg2 in rdx
-            }
-
-            void operator()(const node_asterisk& node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "*\n";
-                g.output(out) << "mul rbx\n";
-            }
-
-            void operator()(const node_plus& node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "+\n";
-                g.output(out) << "add rax, rbx\n";
-            }
-
-            void operator()(const node_minus& node) const
-            {
-                IF_VERBOSE(2) g.output(out, false) << "-\n";
-                g.output(out) << "sub rax, rbx\n";
-            }
-
-            generator& g;
-            std::stringstream& out;
-        };
-        visit<visitor>(out, "binary operator", node->n_value);
-    }
-
-    void generator::generate_if(std::stringstream& out, const node_if* node)
-    {
-        generate_expression(out, node->n_expression);
-        std::string label_end_if = create_label();
-        output(out) << "test rax, rax\n";
-        output(out) << "jz " << label_end_if << '\n';
-        generate_statement(out, node->n_statement);
-        output_label(out, label_end_if) << '\n';
-    }
-
-    void generator::generate_scoped_if(std::stringstream& out, const node_scoped_if* node)
-    {
-        std::string label_end_if = create_label();
-        std::string label_next_if = node->ifs.size() == 1 ? label_end_if : create_label(); // Copy ok, won't allocate.
-
-        std::size_t i = 0;
-        do
-        {
-            auto n_if = node->ifs[i++];
-            if (n_if->n_expression) // Only else blocks won't enter here.
-            {
-                generate_expression(out, n_if->n_expression);
-                output(out) << "test rax, rax\n";
-                output(out) << "jz " << label_next_if << '\n';
-            }
-            generate_statement(out, n_if->n_statement);
-            if (i < node->ifs.size())
-            {
-                output(out) << "jmp " << label_end_if << '\n';
-                output_label(out, label_next_if);
-                VERBOSE_COMMENT(out, node->ifs[i]->n_expression ? "elif" : "else") << '\n';
-                label_next_if = i + 1 < node->ifs.size() ? create_label() : label_end_if;
-            }
-        }
-        while (i < node->ifs.size());
-
-        output_label(out, label_end_if);
-        VERBOSE_COMMENT(out, "endif") << '\n';
-    }
-
-    void generator::generate_scope(std::stringstream& out, const node_scope* node)
-    {
-        begin_scope();
-        for (auto n_scoped_statement : node->scoped_statements)
-            generate_scoped_statement(out, n_scoped_statement);
-        end_scope(out);
-    }
-
-    std::stringstream& generator::output(std::stringstream& out, bool indent)
+    std::stringstream& generator::output(bool indent)
     {
         if (indent)
         {
             IF_VERBOSE(2)
             {
                 for (std::size_t i = 0; i < _indent_level; ++i)
-                    out << "    ";
+                    *_output_current << "    ";
             }
             else
-                out << "    ";
+                *_output_current << "    ";
         }
-        return out;
+        return *_output_current;
     }
 
-    std::stringstream& generator::push(std::stringstream& out)
+    std::stringstream& generator::push()
     {
         ++_stack_pointer;
-        output(out) << "push ";
-        return out;
+        output() << "push ";
+        return *_output_current;
     }
 
-    std::stringstream& generator::pop(std::stringstream& out)
+    std::stringstream& generator::pop()
     {
         --_stack_pointer;
-        output(out) << "pop ";
-        return out;
+        output() << "pop ";
+        return *_output_current;
     }
 
-    std::stringstream& generator::output_label(std::stringstream& out, std::string_view label)
+    std::stringstream& generator::output_label(std::string_view label)
     {
         IF_VERBOSE(2)
-            for (std::size_t i = 0; i < _indent_level - 1; ++i)
-                out << "    ";
-        out << label << ':';
-        return out;
-    }
-
-    std::string generator::stack_frame_offset(std::ptrdiff_t offset)
-    {
-        std::string string = "rbp";
-        if (std::ptrdiff_t rsp_offset = std::abs(offset * elem_size))
         {
-            string += ' ';
-            string += (offset > 0 ? '+' : '-');
-            string += ' ';
-            string += std::to_string(rsp_offset);
+            for (std::size_t i = 0; i < _indent_level - 1; ++i)
+                *_output_current << "    ";
         }
-        return string;
+        *_output_current << label << ':';
+        return *_output_current;
     }
 
     void generator::begin_scope()
@@ -406,13 +425,13 @@ namespace shl
         _scopes.push_back(get_current_function().variables.size());
     }
 
-    void generator::end_scope(std::stringstream& out)
+    void generator::end_scope()
     {
         auto& variables = get_current_function().variables;
         std::size_t pop_count = variables.size() - _scopes.back();
         if (pop_count > 0)
         {
-            output(out) << "add rsp, " << (pop_count * elem_size) << '\n';
+            output() << "add rsp, " << (pop_count * elem_size) << '\n';
             _stack_pointer -= pop_count;
             variables.erase(variables.end() - pop_count, variables.end());
         }
@@ -433,21 +452,22 @@ namespace shl
 
         // Generate start.
 
-        output(_output_start, false) << "global _start\n_start:\n";
-        push(_output_start) << '0'; VERBOSE_COMMENT(_output_start, "status") << '\n';
-        output(_output_start) << "mov rbp, rsp\n";
+        _output_current = &_output_start;
+        output(false) << "global _start\n_start:\n";
+        push() << '0'; VERBOSE_COMMENT(1, "status") << '\n';
+        output() << "mov rbp, rsp\n";
 
         if (!entry_point->parameters.empty())
         {
-            push(_output_start) << "rdi"; VERBOSE_COMMENT(_output_start, "argc") << '\n';
-            push(_output_start) << "rsi"; VERBOSE_COMMENT(_output_start, "argv") << '\n';
+            push() << "rdi"; VERBOSE_COMMENT(1, "argc") << '\n';
+            push() << "rsi"; VERBOSE_COMMENT(1, "argv") << '\n';
         }
 
-        output(_output_start) << "call " << entry_point->signature << '\n';
+        output() << "call " << entry_point->signature << '\n';
 
-        output(_output_start) << "mov rax, 60\n";
-        output(_output_start) << "mov rdi, [rbp]\n";
-        output(_output_start) << "syscall\n";
+        output() << "mov rax, 60\n";
+        output() << "mov rdi, [rbp]\n";
+        output() << "syscall\n";
     }
 
     std::string generator::create_label(std::string_view short_name) noexcept
@@ -480,7 +500,15 @@ namespace shl
         return signature;
     }
 
-    auto generator::allocate_variable(std::stringstream& out, std::string_view name) -> variable&
+    void generator::visit(generator_visitor* visitor, std::string_view name, const nodes& variant)
+    {
+        IF_VERBOSE(2) output() << "; " << name << ": ";
+        ++_indent_level;
+        std::visit(*visitor, variant);
+        --_indent_level;
+    }
+
+    auto generator::allocate_variable(std::string_view name) -> variable&
     {
         if (get_variable(name))
             error_exit("Redefined variable.");
@@ -489,55 +517,20 @@ namespace shl
         {
             auto& variable = variables.emplace_back(name, -(1 + variables.size()));
             ++_stack_pointer;
-            output(out) << "sub rsp, " << elem_size << '\n';
+            output() << "sub rsp, " << elem_size << '\n';
             return variable;
         }
         else
             return _static_variables.emplace_back(name, 0);
     }
 
-    void generator::deallocate_variable(std::stringstream& out)
+    void generator::deallocate_variable()
     {
         assert(has_current_function());
         auto& function = get_current_function();
         function.variables.pop_back();
         --_stack_pointer;
-        output(out) << "add rsp, " << elem_size << '\n';
-    }
-
-    auto generator::create_function(const node_named_function* node) -> function&
-    {
-        std::string signature = get_function_signature(node);
-
-        if (get_function_from_signature(signature))
-            error_exit("Redefined function.");
-
-        std::size_t previous_function_index = _current_function_index;
-        _current_function_index = _functions.size();
-        auto& function = _functions.emplace_back(node->n_name->value, std::move(signature));
-
-        std::ptrdiff_t return_value_count = node->n_function->return_values.size();
-        std::ptrdiff_t parameter_count = node->n_function->parameters.size();
-        std::ptrdiff_t stack_offset = return_value_count + parameter_count + 1; // + 1 only if push rbp
-
-        // Convert the return values.
-        function.return_values.reserve(return_value_count);
-        for (auto n_return_value : node->n_function->return_values)
-            function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
-        // Convert the parameters.
-        function.parameters.reserve(parameter_count);
-        for (auto n_parameter : node->n_function->parameters)
-            function.parameters.emplace_back(n_parameter->n_name->value, stack_offset--);
-
-        output_label(function.output, function.signature) << '\n';
-        push(function.output) << "rbp\n";
-        output(function.output) << "mov rbp, rsp\n";
-        generate_statement(function.output, node->n_function->n_statement);
-        pop(function.output) << "rbp\n";
-        output(function.output) << "ret\n";
-
-        _current_function_index = previous_function_index;
-        return function;
+        output() << "add rsp, " << elem_size << '\n';
     }
 
     auto generator::get_variable(std::string_view name) -> variable*
@@ -583,5 +576,23 @@ namespace shl
     bool generator::has_current_function() const noexcept
     {
         return 0 <= _current_function_index;
+    }
+
+    std::string generator::variable::get_address() const
+    {
+        if (in_function())
+        {
+            std::string string = "rbp";
+            if (std::ptrdiff_t rsp_offset = std::abs(stack_offset * elem_size))
+            {
+                string += ' ';
+                string += (stack_offset > 0 ? '+' : '-');
+                string += ' ';
+                string += std::to_string(rsp_offset);
+            }
+            return string;
+        }
+        else
+            return std::string(name);
     }
 } // namespace shl

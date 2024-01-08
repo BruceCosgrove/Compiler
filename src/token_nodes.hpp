@@ -63,6 +63,46 @@ namespace shl
     struct node_move {};
 
 
+    // All node types.
+    #define NODE_TYPES \
+        node_program*, \
+        node_declaration*, \
+        node_definition*, \
+        node_declare_variable*, \
+        node_define_variable*, \
+        node_function*, \
+        node_named_function*, \
+        node_parameter*, \
+        node_scope*, \
+        node_statement*, \
+        node_scoped_statement*, \
+        node_expression*, \
+        node_term*, \
+        node_return*, \
+        node_if*, \
+        node_reassign*, \
+        node_scoped_if*, \
+        node_binary_expression*, \
+        node_parenthesised_expression*, \
+        node_binary_operator*, \
+        node_parameter_pass*, \
+        node_integer_literal*, \
+        node_identifier*, \
+        node_forward_slash, \
+        node_percent, \
+        node_asterisk, \
+        node_plus, \
+        node_minus, \
+        node_in, \
+        node_out, \
+        node_inout, \
+        node_copy, \
+        node_move
+
+    // Variant of all node types.
+    using nodes = std::variant<NODE_TYPES>;
+
+
     // Define all the undefined nodes in the same order.
 
     struct node_program

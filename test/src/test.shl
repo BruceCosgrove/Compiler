@@ -8,7 +8,6 @@ main: (status: let; argc: let, argv: let) = {
         status = 5;
 }
 
-/*
 bar: (ret: let; condition: let) = {
     if condition {
         ret = 64;
@@ -16,12 +15,9 @@ bar: (ret: let; condition: let) = {
     }
     ret = 42;
 }
-*/
 
-/*
 foo: (x: let, y: let; a: let, b: let, c: let) = {
     z: let = 6;
     x = a / z + b;
     y = b - c * z;
 }
-*/
