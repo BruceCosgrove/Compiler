@@ -32,10 +32,10 @@ namespace shl
                 if (try_consume(token_type::equals_))
                 {
                     if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
-                        n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_variable>(n_identifier, n_expression));
+                        n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_object>(n_identifier, n_expression));
                 }
                 else
-                    n_declaration->n_value = _allocator.allocate<node_declare_variable>(n_identifier);
+                    n_declaration->n_value = _allocator.allocate<node_declare_object>(n_identifier);
                 try_consume(token_type::semicolon_, "Expected ';'.");
                 return n_declaration;
             }
@@ -50,13 +50,13 @@ namespace shl
         return nullptr;
     }
 
-    node_declare_variable* parser::try_parse_declare_variable()
+    node_declare_object* parser::try_parse_declare_object()
     {
         if (auto n_identifier = try_parse_identifier())
         {
             try_consume(token_type::colon_, "Expected ':'.");
             try_consume(token_type::let_, "Expected \"let\".");
-            return _allocator.allocate<node_declare_variable>(n_identifier);
+            return _allocator.allocate<node_declare_object>(n_identifier);
         }
         return nullptr;
     }
@@ -69,14 +69,14 @@ namespace shl
             if (try_consume(token_type::open_parenthesis_))
             {
                 auto n_function = _allocator.allocate<node_function>();
-                // Parse any return variables.
-                if (auto n_declare_variable = try_parse_declare_variable())
+                // Parse any return objects.
+                if (auto n_declare_object = try_parse_declare_object())
                 {
-                    n_function->return_values.push_back(n_declare_variable);
+                    n_function->return_values.push_back(n_declare_object);
                     while (try_consume(token_type::comma_))
                     {
-                        n_declare_variable = try_parse(&parser::try_parse_declare_variable, "Expected return value declaration.");
-                        n_function->return_values.push_back(n_declare_variable);
+                        n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected return value declaration.");
+                        n_function->return_values.push_back(n_declare_object);
                     }
                 }
                 if (try_consume(token_type::semicolon_))

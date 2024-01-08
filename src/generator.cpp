@@ -54,25 +54,25 @@ namespace shl
             g.visit(this, "definition", cast_variant<NODE_TYPES>(node->n_value));
         }
 
-        void operator()(const node_declare_variable* node)
+        void operator()(const node_declare_object* node)
         {
-            VERBOSE_OUT(2, "declare variable\n", true);
-            assert(false && "declare variable unimplemented.");
+            VERBOSE_OUT(2, "declare object\n", true);
+            assert(false && "declare object unimplemented.");
         }
 
-        void operator()(const node_define_variable* node)
+        void operator()(const node_define_object* node)
         {
-            VERBOSE_OUT(2, "define variable\n", true);
+            VERBOSE_OUT(2, "define object\n", true);
             std::string_view name = node->n_name->value;
-            auto& variable = g.allocate_variable(name);
-            if (variable.in_function())
+            auto& object = g.allocate_object(name);
+            if (object.in_function())
             {
                 g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
-                g.output() << "mov [" << variable.get_address() << "], rax";
+                g.output() << "mov [" << object.get_address() << "], rax";
                 VERBOSE_COMMENT(1, node->n_name->value, true) << '\n';
             }
             else
-                assert(false && "define static variable unimplemented.");
+                assert(false && "define static object unimplemented.");
         }
 
         void operator()(const node_function* node)
@@ -180,17 +180,17 @@ namespace shl
         {
             VERBOSE_OUT(2, "reassign\n", true);
 
-            auto variable = g.get_variable(node->n_identifier->value);
-            if (!variable) error_exit("Undefined variable.");
+            auto object = g.get_object(node->n_identifier->value);
+            if (!object) error_exit("Undefined object.");
 
-            if (variable->in_function())
+            if (object->in_function())
             {
                 g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
-                g.output() << "mov [" << variable->get_address() << "], rax";
+                g.output() << "mov [" << object->get_address() << "], rax";
                 VERBOSE_COMMENT(1, node->n_identifier->value, true) << '\n';
             }
             else
-                assert(false && "reassign static variable unimplemented.");
+                assert(false && "reassign static object unimplemented.");
         }
 
         void operator()(const node_scoped_if* node)
@@ -288,16 +288,16 @@ namespace shl
         {
             VERBOSE_OUT(2, "identifier\n", true);
 
-            auto variable = g.get_variable(node->value);
-            if (!variable) error_exit("Undefined variable.");
+            auto object = g.get_object(node->value);
+            if (!object) error_exit("Undefined object.");
 
-            if (variable->in_function())
+            if (object->in_function())
             {
-                g.output() << "mov rax, QWORD [" << variable->get_address() << "]";
+                g.output() << "mov rax, QWORD [" << object->get_address() << "]";
                 VERBOSE_COMMENT(1, node->value, true) << '\n';
             }
             else
-                assert(false && "identifier static variable unimplemented.");
+                assert(false && "identifier static object unimplemented.");
         }
 
         void operator()(const node_forward_slash& node)
@@ -365,8 +365,8 @@ namespace shl
         generate_start();
 
         // Output data.
-        for (auto& static_variable : _static_variables)
-            _output_data << static_variable.name << ": dq 0\n";
+        for (auto& static_object : _static_objects)
+            _output_data << static_object.name << ": dq 0\n";
 
         // Output text.
         for (auto& function : _functions)
@@ -422,52 +422,20 @@ namespace shl
 
     void generator::begin_scope()
     {
-        _scopes.push_back(get_current_function().variables.size());
+        _scopes.push_back(get_current_function().objects.size());
     }
 
     void generator::end_scope()
     {
-        auto& variables = get_current_function().variables;
-        std::size_t pop_count = variables.size() - _scopes.back();
+        auto& objects = get_current_function().objects;
+        std::size_t pop_count = objects.size() - _scopes.back();
         if (pop_count > 0)
         {
             output() << "add rsp, " << (pop_count * elem_size) << '\n';
             _stack_pointer -= pop_count;
-            variables.erase(variables.end() - pop_count, variables.end());
+            objects.erase(objects.end() - pop_count, objects.end());
         }
         _scopes.pop_back();
-    }
-
-    void generator::generate_start()
-    {
-        // Verify correct state.
-
-        auto entry_point = get_function_from_name(get_input().entry_point);
-        if (!entry_point) error_exit("Entry point not defined.");
-
-        if (entry_point->return_values.size() > 1)
-            error_exit("Ill-formed entry point. Incorrect return value count. Must be 0 or 1.");
-        if (entry_point->parameters.size() != 2 && !entry_point->parameters.empty())
-            error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
-
-        // Generate start.
-
-        _output_current = &_output_start;
-        output(false) << "global _start\n_start:\n";
-        push() << '0'; VERBOSE_COMMENT(1, "status") << '\n';
-        output() << "mov rbp, rsp\n";
-
-        if (!entry_point->parameters.empty())
-        {
-            push() << "rdi"; VERBOSE_COMMENT(1, "argc") << '\n';
-            push() << "rsi"; VERBOSE_COMMENT(1, "argv") << '\n';
-        }
-
-        output() << "call " << entry_point->signature << '\n';
-
-        output() << "mov rax, 60\n";
-        output() << "mov rdi, [rbp]\n";
-        output() << "syscall\n";
     }
 
     std::string generator::create_label(std::string_view short_name) noexcept
@@ -508,45 +476,45 @@ namespace shl
         --_indent_level;
     }
 
-    auto generator::allocate_variable(std::string_view name) -> variable&
+    auto generator::allocate_object(std::string_view name) -> object&
     {
-        if (get_variable(name))
+        if (get_object(name))
             error_exit("Redefined variable.");
-        auto& variables = get_variables();
+        auto& objects = get_objects();
         if (has_current_function())
         {
-            auto& variable = variables.emplace_back(name, -(1 + variables.size()));
+            auto& object = objects.emplace_back(name, -(1 + objects.size()));
             ++_stack_pointer;
             output() << "sub rsp, " << elem_size << '\n';
-            return variable;
+            return object;
         }
         else
-            return _static_variables.emplace_back(name, 0);
+            return _static_objects.emplace_back(name, 0);
     }
 
-    void generator::deallocate_variable()
+    void generator::deallocate_object()
     {
         assert(has_current_function());
         auto& function = get_current_function();
-        function.variables.pop_back();
+        function.objects.pop_back();
         --_stack_pointer;
         output() << "add rsp, " << elem_size << '\n';
     }
 
-    auto generator::get_variable(std::string_view name) -> variable*
+    auto generator::get_object(std::string_view name) -> object*
     {
-        auto check = [=](const variable& variable) { return variable.name == name; };
-        variable* variable = nullptr;
+        auto check = [=](const object& object) { return object.name == name; };
+        object* object = nullptr;
         if (has_current_function())
         {
             auto& function = get_current_function();
-                 if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) variable = it.base();
-            else if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) variable = it.base();
-            else if (auto it = std::ranges::find_if(function.variables, check); it != function.variables.end()) variable = it.base();
+                 if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) object = it.base();
+            else if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) object = it.base();
+            else if (auto it = std::ranges::find_if(function.objects, check); it != function.objects.end()) object = it.base();
         }
-        if (!variable)
-            if (auto it = std::ranges::find_if(_static_variables, check); it != _static_variables.end()) variable = it.base();
-        return variable;
+        if (!object)
+            if (auto it = std::ranges::find_if(_static_objects, check); it != _static_objects.end()) object = it.base();
+        return object;
     }
 
     auto generator::get_function_from_name(std::string_view name) -> function*
@@ -563,9 +531,9 @@ namespace shl
         return nullptr;
     }
 
-    auto generator::get_variables() -> std::vector<variable>&
+    auto generator::get_objects() -> std::vector<object>&
     {
-        return has_current_function() ? get_current_function().variables : _static_variables;
+        return has_current_function() ? get_current_function().objects : _static_objects;
     }
 
     auto generator::get_current_function() -> function&
@@ -578,7 +546,39 @@ namespace shl
         return 0 <= _current_function_index;
     }
 
-    std::string generator::variable::get_address() const
+    void generator::generate_start()
+    {
+        // Verify correct state.
+
+        auto entry_point = get_function_from_name(get_input().entry_point);
+        if (!entry_point) error_exit("Entry point not defined.");
+
+        if (entry_point->return_values.size() > 1)
+            error_exit("Ill-formed entry point. Incorrect return value count. Must be 0 or 1.");
+        if (entry_point->parameters.size() != 2 && !entry_point->parameters.empty())
+            error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
+
+        // Generate start.
+
+        _output_current = &_output_start;
+        output(false) << "global _start\n_start:\n";
+        push() << '0'; VERBOSE_COMMENT(1, "status") << '\n';
+        output() << "mov rbp, rsp\n";
+
+        if (!entry_point->parameters.empty())
+        {
+            push() << "rdi"; VERBOSE_COMMENT(1, "argc") << '\n';
+            push() << "rsi"; VERBOSE_COMMENT(1, "argv") << '\n';
+        }
+
+        output() << "call " << entry_point->signature << '\n';
+
+        output() << "mov rax, 60\n";
+        output() << "mov rdi, [rbp]\n";
+        output() << "syscall\n";
+    }
+
+    std::string generator::object::get_address() const
     {
         if (in_function())
         {

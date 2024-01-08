@@ -23,16 +23,14 @@ namespace shl
         [[nodiscard]] node_program* try_parse_program();
         [[nodiscard]] node_declaration* try_parse_declaration();
         // [[nodiscard]] node_definition* try_parse_definition();
-        // Only used for try_parse_rest_of_define_function.
-        [[nodiscard]] node_declare_variable* try_parse_declare_variable();
-        // [[nodiscard]] node_define_variable* try_parse_define_variable();
+        [[nodiscard]] node_declare_object* try_parse_declare_object();
         [[nodiscard]] node_function* try_parse_function(bool colon_consumed = false);
         [[nodiscard]] node_parameter* try_parse_parameter();
         [[nodiscard]] node_scope* try_parse_scope();
         [[nodiscard]] node_statement* try_parse_statement();
         [[nodiscard]] node_scoped_statement* try_parse_scoped_statement();
         // Also parses operator precedence.
-        [[nodiscard]] node_expression* try_parse_expression(std::uint8_t min_precedence = 0);
+        [[nodiscard]] node_expression* try_parse_expression(std::uint8_t min_precedence);
         [[nodiscard]] node_term* try_parse_term();
 
         // Correspondence: Non-trivial grammar rule case.
@@ -59,7 +57,7 @@ namespace shl
         [[nodiscard]] auto try_parse(Func func, std::string_view error_message, Args&&... args)
         {
             if (auto n = (this->*func)(std::forward<Args>(args)...)) return n;
-            else error_exit("Invalid program.");
+            else error_exit(error_message);
         }
 
     private:

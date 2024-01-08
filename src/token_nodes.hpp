@@ -13,8 +13,8 @@ namespace shl
     struct node_program;
     struct node_declaration;
     struct node_definition;
-    struct node_declare_variable;
-    struct node_define_variable;
+    struct node_declare_object;
+    struct node_define_object;
     struct node_function;
     struct node_named_function;
     struct node_parameter;
@@ -68,8 +68,8 @@ namespace shl
         node_program*, \
         node_declaration*, \
         node_definition*, \
-        node_declare_variable*, \
-        node_define_variable*, \
+        node_declare_object*, \
+        node_define_object*, \
         node_function*, \
         node_named_function*, \
         node_parameter*, \
@@ -112,21 +112,21 @@ namespace shl
 
     struct node_declaration
     {
-        std::variant<node_definition*, node_declare_variable*> n_value;
+        std::variant<node_definition*, node_declare_object*> n_value;
     };
 
     struct node_definition
     {
-        std::variant<node_define_variable*, node_named_function*> n_value;
+        std::variant<node_define_object*, node_named_function*> n_value;
     };
 
-    struct node_declare_variable
+    struct node_declare_object
     {
         node_identifier* n_name;
         // TODO: node_identifier* n_type;
     };
 
-    struct node_define_variable
+    struct node_define_object
     {
         node_identifier* n_name;
         // TODO: node_identifier* n_type;
@@ -135,7 +135,7 @@ namespace shl
 
     struct node_function
     {
-        std::vector<node_declare_variable*> return_values; // 0 or more
+        std::vector<node_declare_object*> return_values; // 0 or more
         std::vector<node_parameter*> parameters; // 0 or more
         node_statement* n_statement;
     };
@@ -184,7 +184,7 @@ namespace shl
         // Returning an expression is invalid since the return values
         // are already named and allocated in the caller's stack frame.
         // However, this does not stop one from returning from a function
-        // early, so long as all out variables are initialized.
+        // early, so long as all out objects are initialized.
     };
 
     struct node_if
