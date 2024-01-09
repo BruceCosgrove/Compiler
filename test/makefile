@@ -21,7 +21,7 @@ DIRS := $(sort $(INT_DIR) $(OUT_DIR))
 EXE := $(OUT_DIR)$(OUT_NAME)
 
 # The compiler to use.
-COMPILER := ../bin/shl
+COMPILER := ../bin/$(cfg)/shl
 # The whole compilation command.
 COMPILE := $(COMPILER) $(SRC) -o $(ASM) -v1
 

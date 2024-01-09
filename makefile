@@ -1,15 +1,26 @@
 # The name of this makefile.
 MAKEFILE := makefile
-# The directory where all source files are located.
-SRC_DIR := src/
-# The directory where all intermediate files should be placed.
-INT_DIR := bin-int/
-# The directory where all output files should be placed.
-OUT_DIR := bin/
 # The output name.
 OUT_NAME := shl
 # The directory where the test is.
 TEST_DIR := test/
+# The default build configuration.
+# To set directly, use "make cfg=debug" or "make cfg=release".
+cfg := debug
+
+# Configurations
+
+CXXFLAGS.debug := -g
+CXXFLAGS.release := -O2
+
+# The directory where all source files are located.
+SRC_DIR := src/
+# The directory where all intermediate files should be placed.
+INT_DIR_ROOT := bin-int/
+INT_DIR := $(INT_DIR_ROOT)$(cfg)/
+# The directory where all output files should be placed.
+OUT_DIR_ROOT := bin/
+OUT_DIR := $(OUT_DIR_ROOT)$(cfg)/
 
 # Get all source filepaths in $(SRC_DIR) and all subdirectories of $(SRC_DIR).
 SRCS := $(wildcard $(SRC_DIR)*.cpp) $(wildcard $(SRC_DIR)**/*.cpp)
@@ -25,7 +36,7 @@ EXE := $(OUT_DIR)$(OUT_NAME)
 # The compiler to use.
 COMPILER := g++-13
 # The compiler flags to use.
-CXXFLAGS := -std=c++23 -Wall -g
+CXXFLAGS := -std=c++23 -Wall $(CXXFLAGS.$(cfg))
 
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)
@@ -35,7 +46,7 @@ all: $(EXE) $(MAKEFILE)
 
 # Create necessary directories, compile, get dependencies, and make sure to recompile everything if the makefile changed.
 $(INT_DIR)%.o: $(SRC_DIR)%.cpp $(MAKEFILE) | create_dirs
-	$(COMPILER) $(CXXFLAGS) -MMD -o $@ -c $<
+	$(COMPILER) $(CXXFLAGS) -MMD -c -o $@ $<
 
 # Link all objs into the executable.
 $(EXE): $(OBJS) $(MAKEFILE)
@@ -50,7 +61,7 @@ $(DIRS):
 # Runs the test.
 .PHONY: run
 run: $(EXE)
-	$(MAKE) -C $(TEST_DIR) run
+	$(MAKE) cfg=$(cfg) -C $(TEST_DIR) run
 
 # Clears the terminal.
 .PHONY: clear
@@ -65,10 +76,10 @@ crun: clean clear run
 # Debugs the test.
 .PHONY: rund
 rund: $(EXE)
-	$(MAKE) -C $(TEST_DIR) rund
+	$(MAKE) cfg=$(cfg) -C $(TEST_DIR) rund
 
 # Removes all intermediates and the executable.
 .PHONY: clean
 clean:
-	rm -rf $(OUT_DIR) $(INT_DIR)
-	$(MAKE) -C $(TEST_DIR) clean
+	rm -rf $(OUT_DIR_ROOT) $(INT_DIR_ROOT)
+	$(MAKE) cfg=$(cfg) -C $(TEST_DIR) clean
