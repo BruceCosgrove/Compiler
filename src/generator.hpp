@@ -2,7 +2,6 @@
 
 #include "input.hpp"
 #include "token_nodes.hpp"
-#include <cassert> // DEBUG
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,7 +21,7 @@ namespace shl
         struct object
         {
             // The name of the object.
-            // When stack_offset is zero, this also serves as its address.
+            // When stack_offset is zero, this also serves as its address (with an underscore appended).
             std::string_view name;
             // The offset into the stack where this object resides.
             // If zero, this object is not on the stack.
@@ -32,12 +31,12 @@ namespace shl
             // 0 is guaranteed to be invalid, but not 1, so 0 is instead used to
             // say this object is not inside a function. This may mean it's static/
             // in the global scope, thread_local, or maybe something else.
-            [[nodiscard]] constexpr bool in_function() const noexcept { return stack_offset != 0; }
+            [[nodiscard]] constexpr bool is_static() const noexcept { return stack_offset == 0; }
 
             // Returns the address of the object.
             // If this object is in a function, returns "rsp+/-stack_offset".
-            // Otherwise, returns the name of this object, which is a label
-            // in the data section, i.e. an address to this object.
+            // Otherwise, returns the name of this object with an appended underscore,
+            // which is a label in the data section, i.e. an address to this object.
             [[nodiscard]] std::string get_address() const;
         };
 
@@ -48,47 +47,28 @@ namespace shl
             std::vector<object> return_values;
             std::vector<object> parameters;
             std::vector<object> objects;
+            std::vector<object> static_objects;
             std::stringstream output;
         };
 
     private:
+        // Optionally outputs appropriate indentation for instructions to the current output stream.
+        // Returns the current output stream for convenience.
         [[nodiscard]] std::stringstream& output(bool indent = true);
-        [[nodiscard]] std::stringstream& push();
-        [[nodiscard]] std::stringstream& pop();
+
+        // Optionally outputs appropriate indentation for the label to the current output stream,
+        // followed by the label itself and a colon. Returns the current output stream for convenience.
         std::stringstream& output_label(std::string_view label);
 
-        void begin_scope();
-        void end_scope();
-
-        // Creates a label string.
-        // As long as short_name is at most 5 characters, this never allocates due to std::string's SSBO.
-        [[nodiscard]] std::string create_label(std::string_view short_name = "label") noexcept;
-        [[nodiscard]] std::string get_function_signature(const node_named_function* node);
-
-        friend struct generator_visitor;
-        void visit(generator_visitor* visitor, std::string_view name, const nodes& variant);
-
-    private:
-        object& allocate_object(std::string_view name);
-        void deallocate_object();
-
-        [[nodiscard]] object* get_object(std::string_view name);
-        [[nodiscard]] function* get_function_from_name(std::string_view name);
-        [[nodiscard]] function* get_function_from_signature(std::string_view name);
-        [[nodiscard]] inline std::vector<object>& get_objects();
-        [[nodiscard]] inline function& get_current_function();
-        [[nodiscard]] inline bool has_current_function() const noexcept;
-
-    private:
-        void generate_start();
-
-        // Move-appends source to destination, then returns destination for convenience.
-        static std::stringstream& output_stream(std::stringstream& destination, std::stringstream& source);
         // Sets the current output to the new output and returns a reference to the old output.
         // Pass that reference back to this function to undo after you're done outputting.
         // The return value from the second call may be completely ignored.
         std::stringstream& exchange_current_output(std::stringstream& new_output);
 
+        // Move-appends source to destination. Returns destination for convenience.
+        static std::stringstream& output_stream(std::stringstream& destination, std::stringstream& source);
+
+        // Calls a function with the specific output stream.
         template <typename Func>
         void with_output(std::stringstream& output, const Func& func)
         {
@@ -98,36 +78,93 @@ namespace shl
         }
 
     private:
+        // Selects which generation function to call next.
+        template <class Visitor>
+        void visit(Visitor* visitor, std::string_view name, const nodes& variant)
+        {
+            IF_VERBOSE(input::verbose_level::indentation) output() << "; " << name << ": ";
+            ++_output.indent_level;
+            std::visit(*visitor, variant);
+            --_output.indent_level;
+        }
+
+        // Allocates a new scope frame.
+        void begin_scope();
+
+        // Deallocates the top scope frame and any variables local in it.
+        void end_scope();
+
+    private:
+        // Creates a global object in bss.
+        object& create_uninitialized(std::string_view name);
+
+        // Creates a global object in data.
+        object& create_initialized(std::string_view name);
+
+        // Creates a global constant in text.
+        object& create_constant(std::string_view name);
+
+        // Creates a local object the current function's stack frame (also in text).
+        object& create_object(std::string_view name, bool is_static);
+
+        [[nodiscard]] object* get_object(std::string_view name);
+        [[nodiscard]] function* get_function_from_name(std::string_view name);
+        [[nodiscard]] function* get_function_from_signature(std::string_view name);
+        [[nodiscard]] inline function& get_current_function();
+        [[nodiscard]] inline bool has_current_function() const noexcept;
+
+        // Creates a label string.
+        // As long as short_name is at most 5 characters, this never allocates due to std::string's SSBO.
+        [[nodiscard]] static std::string create_label(std::string_view short_name = "label") noexcept;
+
+        // Creates a function's signature. This likely allocates.
+        [[nodiscard]] static std::string create_function_signature(const node_named_function* node);
+
+    private:
+        // Generates the pre-entrypoint function if main is defined.
+        void generate_start();
+
+        friend struct generator_visitor;
+
+    private:
         // Input
 
         node_program* _root;
 
         // Output
 
-        // Code segments
-        std::stringstream _output_data, _output_text;
-        // Not code segments, just used to order assembly.
-        std::stringstream _output_start, _output_static_construct, _output_static_destruct;
-        // Points to different existing streams.
-        std::stringstream* _output_current = &_output_text;
-        // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
-        std::size_t _indent_level = 1;
+        struct
+        {
+            // Code segments
+            std::stringstream bss, data, text;
+            // Not code segments, just used to order assembly.
+            std::stringstream _start;
+            std::stringstream uninitialized_static_construct;
+            std::stringstream uninitialized_static_destruct;
+            std::stringstream initialized_static;
+            std::stringstream constants;
+            // Points to different existing streams.
+            std::stringstream* current = nullptr;
+            // Number of indentation levels to indent the assembly by, in sets of 4 spaces.
+            std::uint32_t indent_level = 1;
+        } _output;
 
         // Compilation state.
 
-        // Increments when rsp decrements, and vice versa.
-        std::size_t _stack_pointer = 0;
         // Index into _functions.
         // Used to determine which function is currently being generated, if any.
         std::ptrdiff_t _current_function_index = -1;
         // List of functions generated/being generated thus far.
         std::vector<function> _functions;
-        // List of objects outside any function, aka static objects.
-        std::vector<object> _static_objects;
+        // List of uninitialized aka static objects.
+        std::vector<object> _uninitialized_static_objects;
+        // List of initialized static static objects.
+        std::vector<object> _initialized_static_objects;
+        // List of constant objects.
+        std::vector<object> _constant_objects;
+        // List of
         // Used to deallocate stack objects.
         std::vector<std::size_t> _scopes;
-        // Used to generate unique labels for generic jumps, like if statements.
-        std::uint32_t _label_count = 0;
 
     private:
         static constexpr std::ptrdiff_t elem_size = sizeof(std::uint64_t);

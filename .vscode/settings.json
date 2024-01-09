@@ -2,7 +2,7 @@
     "files.insertFinalNewline": true,
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
-    "C_Cpp.clang_format_fallbackStyle": "{ PointerAlignment: Right }",
+    "C_Cpp.clang_format_fallbackStyle": "{ PointerAlignment: Left }",
 
     "files.associations": {
         "optional": "cpp",
@@ -67,6 +67,7 @@
         "ios": "cpp",
         "locale": "cpp",
         "queue": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "cassert": "cpp"
     }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <variant>
 
 namespace shl
@@ -16,4 +17,7 @@ namespace shl
             old_variant
         );
     }
+
+    // Return a new string with the contents of string, while having after inserted after each character in string.
+    std::string insert_after_each(std::string_view string, std::string_view after);
 } // namespace shl
