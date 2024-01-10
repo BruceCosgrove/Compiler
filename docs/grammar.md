@@ -26,7 +26,7 @@ $$
 
     \text{[named\_function]} &\to \text{[identifier]}\text{[function]}\\
 
-    \text{[parameter]} &\to \text{[parameter\_pass]}?\space\text{[identifier]}:let \\
+    \text{[parameter]} &\to \text{[parameter\_pass]}?\space\text{[identifier]}:\text{[identifier]} \\
 
     \text{[scope]} &\to \{\text{[scoped\_statement]}^*\} \\
 
