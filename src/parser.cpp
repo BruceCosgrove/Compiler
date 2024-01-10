@@ -1,11 +1,10 @@
 #include "parser.hpp"
-#include <iostream> // DEBUG
 
 namespace shl
 {
     node_program* parser::operator()()
     {
-        if (auto n_program = try_parse(&parser::try_parse_program, "Invalid program."))
+        if (auto n_program = try_parse(&parser::try_parse_program, "Invalid program"))
             return n_program;
         return nullptr;
     }
@@ -14,7 +13,7 @@ namespace shl
     {
         auto n_program = _allocator.allocate<node_program>();
         while (peek())
-            if (auto n_declaration = try_parse(&parser::try_parse_declaration, "Invalid declaration."))
+            if (auto n_declaration = try_parse(&parser::try_parse_declaration, "Invalid declaration"))
                 n_program->declarations.push_back(n_declaration);
         if (!n_program->declarations.empty())
             return n_program;
@@ -26,17 +25,17 @@ namespace shl
         if (auto n_identifier = try_parse_identifier())
         {
             auto n_declaration = _allocator.allocate<node_declaration>();
-            try_consume(token_type::colon_, "Expected ':'.");
+            try_consume(token_type::colon_, "Expected ':'");
             if (try_consume(token_type::let_))
             {
                 if (try_consume(token_type::equals_))
                 {
-                    if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                    if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
                         n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_object>(n_identifier, n_expression));
                 }
                 else
                     n_declaration->n_value = _allocator.allocate<node_declare_object>(n_identifier);
-                try_consume(token_type::semicolon_, "Expected ';'.");
+                try_consume(token_type::semicolon_, "Expected ';'");
                 return n_declaration;
             }
             else if (auto n_function = try_parse_function(true))
@@ -45,7 +44,7 @@ namespace shl
                 return n_declaration;
             }
             else
-                error_exit("Ill-formed declaration.");
+                error(peek(), "Ill-formed declaration");
         }
         return nullptr;
     }
@@ -54,8 +53,8 @@ namespace shl
     {
         if (auto n_identifier = try_parse_identifier())
         {
-            try_consume(token_type::colon_, "Expected ':'.");
-            try_consume(token_type::let_, "Expected \"let\".");
+            try_consume(token_type::colon_, "Expected ':'");
+            try_consume(token_type::let_, "Expected \"let\"");
             return _allocator.allocate<node_declare_object>(n_identifier);
         }
         return nullptr;
@@ -75,7 +74,7 @@ namespace shl
                     n_function->return_values.push_back(n_declare_object);
                     while (try_consume(token_type::comma_))
                     {
-                        n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected return value declaration.");
+                        n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected return value declaration");
                         n_function->return_values.push_back(n_declare_object);
                     }
                 }
@@ -87,16 +86,16 @@ namespace shl
                         n_function->parameters.push_back(n_parameter);
                         while (try_consume(token_type::comma_))
                         {
-                            n_parameter = try_parse(&parser::try_parse_parameter, "Expected parameter.");
+                            n_parameter = try_parse(&parser::try_parse_parameter, "Expected parameter");
                             n_function->parameters.push_back(n_parameter);
                         }
                     }
                 }
                 // Consume the closing parenthesis and equal sign.
-                try_consume(token_type::close_parenthesis_, "Expected ')'.");
-                try_consume(token_type::equals_, "Expected '='.");
+                try_consume(token_type::close_parenthesis_, "Expected ')'");
+                try_consume(token_type::equals_, "Expected '='");
                 // Parse the statement.
-                n_function->n_statement = try_parse(&parser::try_parse_statement, "Expected statement.");
+                n_function->n_statement = try_parse(&parser::try_parse_statement, "Expected statement");
                 return n_function;
             }
         }
@@ -110,12 +109,12 @@ namespace shl
         {
             if (!n_parameter_pass) // Default parameter passing is in.
                 n_parameter_pass = _allocator.allocate<node_parameter_pass>(node_in());
-            try_consume(token_type::colon_, "Expected ':'.");
-            try_consume(token_type::let_, "Expected \"let\".");
+            try_consume(token_type::colon_, "Expected ':'");
+            try_consume(token_type::let_, "Expected \"let\"");
             return _allocator.allocate<node_parameter>(n_parameter_pass, n_identifier);
         }
         else if (n_parameter_pass)
-            error_exit("Expected identifier.");
+            error(peek(), "Expected identifier");
         return nullptr;
     }
 
@@ -126,7 +125,7 @@ namespace shl
             auto n_scope = _allocator.allocate<node_scope>();
             while (auto n_scoped_statement = try_parse_scoped_statement())
                 n_scope->scoped_statements.push_back(n_scoped_statement);
-            try_consume(token_type::close_brace_, "Expected '}'.");
+            try_consume(token_type::close_brace_, "Expected '}'");
             return n_scope;
         }
         return nullptr;
@@ -194,9 +193,9 @@ namespace shl
         if (try_consume(token_type::open_parenthesis_))
         {
             auto n_term = _allocator.allocate<node_term>();
-            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
                 n_term->n_value = _allocator.allocate<node_parenthesised_expression>(n_expression);
-            try_consume(token_type::close_parenthesis_, "Expected ')'.");
+            try_consume(token_type::close_parenthesis_, "Expected ')'");
             return n_term;
         }
         return nullptr;
@@ -225,11 +224,22 @@ namespace shl
         return nullptr;
     }
 
+    void parser::error(const std::optional<token>& token, std::string_view error_message)
+    {
+        if (token)
+            error_exit("Parser", error_message, token->line_number, token->column_number);
+        else
+        {
+            auto previous = --iterator();
+            error_exit("Parser", error_message, previous->line_number, previous->column_number);
+        }
+    }
+
     node_return* parser::try_parse_return()
     {
         if (try_consume(token_type::return_))
         {
-            try_consume(token_type::semicolon_, "Expected ';'.");
+            try_consume(token_type::semicolon_, "Expected ';'");
             return _allocator.allocate<node_return>();
         }
         return nullptr;
@@ -242,10 +252,10 @@ namespace shl
             if (auto n_identifier = try_parse_identifier())
             {
                 auto n_reassign = _allocator.allocate<node_reassign>(n_identifier);
-                try_consume(token_type::equals_, "Expected '='.");
-                if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+                try_consume(token_type::equals_, "Expected '='");
+                if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
                     n_reassign->n_expression = n_expression;
-                try_consume(token_type::semicolon_, "Expected ';'.");
+                try_consume(token_type::semicolon_, "Expected ';'");
                 return n_reassign;
             }
         }
@@ -257,9 +267,9 @@ namespace shl
         if (if_consumed || try_consume(token_type::if_))
         {
             auto n_if = _allocator.allocate<node_if>();
-            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression.", 0))
+            if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
                 n_if->n_expression = n_expression;
-            if (auto n_statement = try_parse(&parser::try_parse_statement, "Expected statement."))
+            if (auto n_statement = try_parse(&parser::try_parse_statement, "Expected statement"))
                 n_if->n_statement = n_statement;
             return n_if;
         }
@@ -272,9 +282,9 @@ namespace shl
         {
             auto n_scoped_if = _allocator.allocate<node_scoped_if>(std::vector{n_if});
             while (try_consume(token_type::elif_))
-                n_scoped_if->ifs.push_back(try_parse(&parser::try_parse_if, "Expected expression and statement.", true));
+                n_scoped_if->ifs.push_back(try_parse(&parser::try_parse_if, "Expected expression and statement", true));
             if (try_consume(token_type::else_))
-                n_scoped_if->ifs.push_back(_allocator.allocate<node_if>(nullptr, try_parse(&parser::try_parse_statement, "Expected statement.")));
+                n_scoped_if->ifs.push_back(_allocator.allocate<node_if>(nullptr, try_parse(&parser::try_parse_statement, "Expected statement")));
             return n_scoped_if;
         }
         return nullptr;
@@ -283,14 +293,14 @@ namespace shl
     node_integer_literal* parser::try_parse_integer_literal()
     {
         if (auto t_integer_literal = try_consume(token_type::integer_literal_))
-            return _allocator.allocate<node_integer_literal>(*t_integer_literal->value);
+            return _allocator.allocate<node_integer_literal>(t_integer_literal->value);
         return nullptr;
     }
 
     node_identifier* parser::try_parse_identifier()
     {
         if (auto t_identifier = try_consume(token_type::identifier_))
-            return _allocator.allocate<node_identifier>(*t_identifier->value);
+            return _allocator.allocate<node_identifier>(t_identifier->value);
         return nullptr;
     }
 
@@ -305,6 +315,6 @@ namespace shl
     {
         if (auto t = peek(); t && t->type == type)
             return *consume();
-        error_exit(error_message);
+        else error(t, error_message);
     }
 } // namespace shl

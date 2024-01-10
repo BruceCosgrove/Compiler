@@ -94,7 +94,7 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "named function\n", true);
 
             std::string signature = g.create_function_signature(node);
-            if (g.get_function_from_signature(signature)) error_exit("Redefined function.");
+            if (g.get_function_from_signature(signature)) error_exit("Generator", "Redefined function");
 
             auto previous_function_index = std::exchange(g._current_function_index, static_cast<std::ptrdiff_t>(g._functions.size()));
             auto& function = g._functions.emplace_back(node->n_name->value, std::move(signature));
@@ -190,7 +190,7 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "reassign\n", true);
 
             auto object = g.get_object(node->n_identifier->value);
-            if (!object) error_exit("Undefined object.");
+            if (!object) error_exit("Generator", "Undefined object");
 
             g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
             g.output() << "mov [" << object->get_address() << "], rax";
@@ -295,7 +295,7 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "identifier\n", true);
 
             auto object = g.get_object(node->value);
-            if (!object) error_exit("Undeclared identifier.");
+            if (!object) error_exit("Generator", "Undeclared identifier");
 
             g.output() << "mov rax, QWORD [" << object->get_address() << "]";
             if (!object->is_static())
@@ -458,25 +458,25 @@ namespace shl
 
     auto generator::create_uninitialized(std::string_view name) -> object&
     {
-        if (get_object(name)) error_exit("Redefined object.");
+        if (get_object(name)) error_exit("Generator", "Redefined object");
         return _uninitialized_static_objects.emplace_back(name, 0);
     }
 
     auto generator::create_initialized(std::string_view name) -> object&
     {
-        if (get_object(name)) error_exit("Redefined object.");
+        if (get_object(name)) error_exit("Generator", "Redefined object");
         return _initialized_static_objects.emplace_back(name, 0);
     }
 
     auto generator::create_constant(std::string_view name) -> object&
     {
-        if (get_object(name)) error_exit("Redefined object.");
+        if (get_object(name)) error_exit("Generator", "Redefined object");
         return _constant_objects.emplace_back(name, 0);
     }
 
     auto generator::create_object(std::string_view name, bool is_static) -> object&
     {
-        if (get_object(name)) error_exit("Redefined object.");
+        if (get_object(name)) error_exit("Generator", "Redefined object");
         assert(has_current_function());
 
         if (!is_static)
@@ -579,9 +579,9 @@ namespace shl
         if (!entry_point) return;
 
         if (entry_point->return_values.size() > 1)
-            error_exit("Ill-formed entry point. Incorrect return value count. Must be 0 or 1.");
+            error_exit("Generator", "Ill-formed entry point. Incorrect return value count. Must be 0 or 1");
         if (entry_point->parameters.size() != 2 && !entry_point->parameters.empty())
-            error_exit("Ill-formed entry point. Incorrect parameter count. Must be 0 or 2.");
+            error_exit("Generator", "Ill-formed entry point. Incorrect parameter count. Must be 0 or 2");
 
         // Generate start.
 

@@ -12,42 +12,49 @@ namespace shl
         {
             if (try_consume_whitespace_and_comments()) continue;
             else if (auto token_value = try_consume_integer_literal())
-                tokens.emplace_back(token_type::integer_literal_, token_value);
+                tokens.emplace_back(token_type::integer_literal_, line_number, get_column_count(), *token_value);
             else if (auto token_value = try_consume_identifier())
             {
-                     if (token_value == "let")    tokens.emplace_back(token_type::let_);
-                else if (token_value == "return") tokens.emplace_back(token_type::return_);
-                else if (token_value == "if")     tokens.emplace_back(token_type::if_);
-                else if (token_value == "elif")   tokens.emplace_back(token_type::elif_);
-                else if (token_value == "else")   tokens.emplace_back(token_type::else_);
-                else tokens.emplace_back(token_type::identifier_, token_value);
+                     if (token_value == "let")    tokens.emplace_back(token_type::let_, line_number, get_column_count());
+                else if (token_value == "return") tokens.emplace_back(token_type::return_, line_number, get_column_count());
+                else if (token_value == "if")     tokens.emplace_back(token_type::if_, line_number, get_column_count());
+                else if (token_value == "elif")   tokens.emplace_back(token_type::elif_, line_number, get_column_count());
+                else if (token_value == "else")   tokens.emplace_back(token_type::else_, line_number, get_column_count());
+                else tokens.emplace_back(token_type::identifier_, line_number, get_column_count(), *token_value);
             }
-            else if (try_consume_token('(')) tokens.emplace_back(token_type::open_parenthesis_);
-            else if (try_consume_token(')')) tokens.emplace_back(token_type::close_parenthesis_);
-            else if (try_consume_token('{')) tokens.emplace_back(token_type::open_brace_);
-            else if (try_consume_token('}')) tokens.emplace_back(token_type::close_brace_);
-            else if (try_consume_token('[')) tokens.emplace_back(token_type::open_bracket_);
-            else if (try_consume_token(']')) tokens.emplace_back(token_type::close_bracket_);
-            else if (try_consume_token(':')) tokens.emplace_back(token_type::colon_);
-            else if (try_consume_token(';')) tokens.emplace_back(token_type::semicolon_);
-            else if (try_consume_token(',')) tokens.emplace_back(token_type::comma_);
-            else if (try_consume_token('=')) tokens.emplace_back(token_type::equals_);
+            else if (try_consume_token('(')) tokens.emplace_back(token_type::open_parenthesis_, line_number, get_column_count());
+            else if (try_consume_token(')')) tokens.emplace_back(token_type::close_parenthesis_, line_number, get_column_count());
+            else if (try_consume_token('{')) tokens.emplace_back(token_type::open_brace_, line_number, get_column_count());
+            else if (try_consume_token('}')) tokens.emplace_back(token_type::close_brace_, line_number, get_column_count());
+            else if (try_consume_token('[')) tokens.emplace_back(token_type::open_bracket_, line_number, get_column_count());
+            else if (try_consume_token(']')) tokens.emplace_back(token_type::close_bracket_, line_number, get_column_count());
+            else if (try_consume_token(':')) tokens.emplace_back(token_type::colon_, line_number, get_column_count());
+            else if (try_consume_token(';')) tokens.emplace_back(token_type::semicolon_, line_number, get_column_count());
+            else if (try_consume_token(',')) tokens.emplace_back(token_type::comma_, line_number, get_column_count());
+            else if (try_consume_token('=')) tokens.emplace_back(token_type::equals_, line_number, get_column_count());
 
-            else if (try_consume_token('/')) tokens.emplace_back(token_type::forward_slash_);
-            else if (try_consume_token('%')) tokens.emplace_back(token_type::percent_);
-            else if (try_consume_token('*')) tokens.emplace_back(token_type::asterisk_);
-            else if (try_consume_token('+')) tokens.emplace_back(token_type::plus_);
-            else if (try_consume_token('-')) tokens.emplace_back(token_type::minus_);
+            else if (try_consume_token('/')) tokens.emplace_back(token_type::forward_slash_, line_number, get_column_count());
+            else if (try_consume_token('%')) tokens.emplace_back(token_type::percent_, line_number, get_column_count());
+            else if (try_consume_token('*')) tokens.emplace_back(token_type::asterisk_, line_number, get_column_count());
+            else if (try_consume_token('+')) tokens.emplace_back(token_type::plus_, line_number, get_column_count());
+            else if (try_consume_token('-')) tokens.emplace_back(token_type::minus_, line_number, get_column_count());
 
-            else error_exit("Invalid character.");
+            else error_exit("Tokenizer", "Invalid character", line_number, get_column_count());
         }
 
         reset();
+        line_number = 1;
         return tokens;
     }
 
     bool tokenizer::try_consume_whitespace_and_comments()
     {
+        if (*peek() == '\n')
+        {
+            consume();
+            on_newline();
+            return true;
+        }
         if (try_consume_token(&is_space, &is_space))
             return true;
         if (try_consume_token("//"))
@@ -55,7 +62,8 @@ namespace shl
             // Consume the rest of the line.
             (void)try_consume_token(&is_not_line_ending, &is_not_line_ending);
             // Consume the line ending.
-            (void)try_consume_token(&is_space, &is_space);
+            if (try_consume_token(&is_space, &is_space))
+                on_newline();
             return true;
         }
         if (try_consume_token("/*"))
@@ -63,6 +71,8 @@ namespace shl
             char looking_for = '*';
             while (auto c = peek())
             {
+                if (*c == '\n')
+                    on_newline();
                 consume();
                 if (*c == looking_for)
                 {
@@ -75,7 +85,7 @@ namespace shl
                     looking_for = '*';
             }
             // there is no end to the multi-line comment.
-            error_exit("Multi-line comment never closed. Expected \"*/\".");
+            error_exit("Tokenizer", "Multi-line comment never closed. Expected \"*/\"", line_number, get_column_count());
         }
         return false;
     }
@@ -133,5 +143,16 @@ namespace shl
         static thread_local char c_wanted; // thread_local for future proofing.
         c_wanted = wanted;
         return try_consume_token([](char c) { return c == c_wanted; });
+    }
+
+    void tokenizer::on_newline()
+    {
+        ++line_number;
+        column_iterator = iterator();
+    }
+
+    std::uint32_t tokenizer::get_column_count()
+    {
+        return iterator() - column_iterator;
     }
 } // namespace shl

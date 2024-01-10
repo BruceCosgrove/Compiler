@@ -26,5 +26,13 @@ namespace shl
         [[nodiscard]] std::optional<std::string_view> try_consume_token(token_pred char_pred);
         [[nodiscard]] std::optional<std::string_view> try_consume_token(std::string_view wanted);
         [[nodiscard]] std::optional<std::string_view> try_consume_token(char wanted);
+
+    private:
+        void on_newline();
+        std::uint32_t get_column_count();
+
+    private:
+        std::uint32_t line_number = 1;
+        const_iterator column_iterator;
     };
 } // namespace shl

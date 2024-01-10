@@ -30,24 +30,24 @@ namespace shl
                     {
                         _input.verbose_level = static_cast<decltype(input::verbose_level)>(std::stoi(optarg));
                         if (_input.verbose_level >= input::verbose_level::_count)
-                            error_exit("Invalid -v argument.");
+                            error_exit("Input", "Invalid -v argument");
                     }
                     catch (std::exception&) // The stl has it's ugly parts too.
                     {
-                        error_exit("Invalid -v argument.");
+                        error_exit("Input", "Invalid -v argument");
                     }
                     break;
                 case 'e':
                     _input.entry_point = optarg; // Construct std::string_view once (std::strlen called).
                     if (!is_identifier(_input.entry_point))
-                        error_exit("Invalid -e argument: it's not an identifier.");
+                        error_exit("Input", "Invalid -e argument: it's not an identifier");
                     break;
             }
         }
 
         // TODO: For now, only accept one input file.
         if (optind + 1 != argc)
-            error_exit("You must provide exactly one input source file.");
+            error_exit("Input", "You must provide exactly one input source file");
 
         _input.in_path = argv[optind];
         if (_input.out_path.empty())

@@ -110,6 +110,8 @@ namespace shl
     struct token
     {
         token_type type;
-        std::optional<std::string_view> value;
+        std::uint32_t line_number;
+        std::uint32_t column_number;
+        std::string_view value;
     };
 } // namespace shl

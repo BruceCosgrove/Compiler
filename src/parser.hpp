@@ -57,8 +57,11 @@ namespace shl
         [[nodiscard]] auto try_parse(Func func, std::string_view error_message, Args&&... args)
         {
             if (auto n = (this->*func)(std::forward<Args>(args)...)) return n;
-            else error_exit(error_message);
+            else error(std::nullopt, error_message);
         }
+
+    private:
+        [[noreturn]] void error(const std::optional<token>& token, std::string_view error_message);
 
     private:
         arena_allocator _allocator{1024 * 1024}; // 1 MiB blocks.
