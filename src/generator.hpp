@@ -44,10 +44,12 @@ namespace shl
         {
             std::string_view name;
             std::string signature;
+            std::string namespace_;
             std::vector<object> return_values;
             std::vector<object> parameters;
             std::vector<object> objects;
             std::vector<object> static_objects;
+            std::vector<function> nested_functions;
             std::stringstream output;
         };
 
@@ -118,11 +120,13 @@ namespace shl
         [[nodiscard]] static std::string create_label(std::string_view short_name = "label") noexcept;
 
         // Creates a function's signature. This likely allocates.
-        [[nodiscard]] static std::string create_function_signature(const node_named_function* node);
+        [[nodiscard]] std::string create_function_signature(const node_named_function* node);
 
     private:
         // Generates the pre-entrypoint function if main is defined.
         void generate_start();
+        // Generates a function and its nested functions.
+        void generate_function(function& function);
 
         friend struct generator_visitor;
 
@@ -151,9 +155,8 @@ namespace shl
 
         // Compilation state.
 
-        // Index into _functions.
-        // Used to determine which function is currently being generated, if any.
-        std::ptrdiff_t _current_function_index = -1;
+        // List of nested function signatures.
+        std::vector<std::string_view> _nested_function_signatures;
         // List of functions generated/being generated thus far.
         std::vector<function> _functions;
         // List of uninitialized aka static objects.
@@ -162,7 +165,7 @@ namespace shl
         std::vector<object> _initialized_static_objects;
         // List of constant objects.
         std::vector<object> _constant_objects;
-        // List of
+        // List of stack offsets.
         // Used to deallocate stack objects.
         std::vector<std::size_t> _scopes;
 

@@ -93,11 +93,15 @@ namespace shl
         {
             VERBOSE_OUT(input::verbose_level::indentation, "named function\n", true);
 
+            std::stringstream s_namespace;
+            for (std::string_view nested_signature : g._nested_function_signatures)
+                s_namespace << nested_signature << ".."; // The .. replaces :: (namespace resolution operator).
             std::string signature = g.create_function_signature(node);
             if (g.get_function_from_signature(signature)) error_exit("Generator", "Redefined function");
 
-            auto previous_function_index = std::exchange(g._current_function_index, static_cast<std::ptrdiff_t>(g._functions.size()));
-            auto& function = g._functions.emplace_back(node->n_name->value, std::move(signature));
+            auto& functions = g.has_current_function() ? g.get_current_function().nested_functions : g._functions;
+            auto& function = functions.emplace_back(node->n_name->value, std::move(signature), std::move(s_namespace).str());
+            g._nested_function_signatures.push_back(function.signature);
 
             std::ptrdiff_t return_value_count = node->n_function->return_values.size();
             std::ptrdiff_t parameter_count = node->n_function->parameters.size();
@@ -115,7 +119,8 @@ namespace shl
 
             g.with_output(function.output, [&]
             {
-                g.output_label(function.signature) << '\n';
+                // TODO: dont allocate this
+                g.output_label(function.namespace_ + function.signature) << '\n';
                 g.output() << "push rbp\n";
                 g.output() << "mov rbp, rsp\n";
                 g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_function->n_statement->n_value));
@@ -123,8 +128,7 @@ namespace shl
                 g.output() << "ret\n";
             });
 
-            // Restore the state.
-            std::swap(g._current_function_index, previous_function_index);
+            g._nested_function_signatures.pop_back();
         }
 
         void operator()(const node_parameter* node)
@@ -190,7 +194,7 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "reassign\n", true);
 
             auto object = g.get_object(node->n_identifier->value);
-            if (!object) error_exit("Generator", "Undefined object");
+            if (!object) ERROR_EXIT("Generator", "Undefined object \"" << node->n_identifier->value << '"');
 
             g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
             g.output() << "mov [" << object->get_address() << "], rax";
@@ -388,7 +392,7 @@ namespace shl
 
         IF_VERBOSE(input::verbose_level::comments) _output.text << "; Define provided functions.\n";
         for (auto& function : _functions)
-            output_stream(_output.text, function.output) << '\n';
+            generate_function(function);
         IF_VERBOSE(input::verbose_level::comments) _output.text << "; Define the pre-entrypoint.\n";
         output_stream(_output.text, _output._start);
 
@@ -440,13 +444,11 @@ namespace shl
 
     void generator::begin_scope()
     {
-        assert(has_current_function());
         _scopes.push_back(get_current_function().objects.size());
     }
 
     void generator::end_scope()
     {
-        assert(has_current_function());
         auto& objects = get_current_function().objects;
         if (std::size_t pop_count = objects.size() - _scopes.back())
         {
@@ -499,21 +501,21 @@ namespace shl
     auto generator::get_object(std::string_view name) -> object*
     {
         auto check = [=](const object& object) { return object.name == name; };
-        object* object = nullptr;
+        object* object_ = nullptr;
         if (has_current_function())
         {
             auto& function = get_current_function();
-                 if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) object = it.base();
-            else if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) object = it.base();
-            else if (auto it = std::ranges::find_if(function.objects, check); it != function.objects.end()) object = it.base();
-            else if (auto it = std::ranges::find_if(function.static_objects, check); it != function.static_objects.end()) object = it.base();
+                 if (auto it = std::ranges::find_if(function.parameters, check); it != function.parameters.end()) object_ = it.base();
+            else if (auto it = std::ranges::find_if(function.return_values, check); it != function.return_values.end()) object_ = it.base();
+            else if (auto it = std::ranges::find_if(function.objects, check); it != function.objects.end()) object_ = it.base();
+            else if (auto it = std::ranges::find_if(function.static_objects, check); it != function.static_objects.end()) object_ = it.base();
         }
-        if (!object)
+        if (!object_)
         {
-                 if (auto it = std::ranges::find_if(_uninitialized_static_objects, check); it != _uninitialized_static_objects.end()) object = it.base();
-            else if (auto it = std::ranges::find_if(_initialized_static_objects, check); it != _initialized_static_objects.end()) object = it.base();
+                 if (auto it = std::ranges::find_if(_uninitialized_static_objects, check); it != _uninitialized_static_objects.end()) object_ = it.base();
+            else if (auto it = std::ranges::find_if(_initialized_static_objects, check); it != _initialized_static_objects.end()) object_ = it.base();
         }
-        return object;
+        return object_;
     }
 
     auto generator::get_function_from_name(std::string_view name) -> function*
@@ -526,18 +528,30 @@ namespace shl
     auto generator::get_function_from_signature(std::string_view signature) -> function*
     {
         auto check = [=](const function& function) { return function.signature == signature; };
-        if (auto it = std::ranges::find_if(_functions, check); it != _functions.end()) return it.base();
-        return nullptr;
+        function* function = nullptr;
+        if (has_current_function())
+        {
+            auto& functions = get_current_function().nested_functions;
+            if (check(get_current_function())) function = &get_current_function();
+            else if (auto it = std::ranges::find_if(functions, check); it != functions.end()) function = it.base();
+        }
+        if (!function)
+            if (auto it = std::ranges::find_if(_functions, check); it != _functions.end()) function = it.base();
+        return function;
     }
 
     auto generator::get_current_function() -> function&
     {
-        return _functions[_current_function_index];
+        assert(has_current_function());
+        function* function = &_functions.back();
+        while (!function->nested_functions.empty())
+            function = &function->nested_functions.back();
+        return *function;
     }
 
     bool generator::has_current_function() const noexcept
     {
-        return 0 <= _current_function_index;
+        return !_nested_function_signatures.empty();
     }
 
     std::string generator::create_label(std::string_view short_name) noexcept
@@ -552,19 +566,19 @@ namespace shl
 
     std::string generator::create_function_signature(const node_named_function* node)
     {
-        std::stringstream ssignaure;
-        ssignaure << node->n_name->value;
+        std::stringstream s_signaure;
+        s_signaure << node->n_name->value;
 
-        ssignaure << '_';
+        s_signaure << '_';
         for (auto n_return_value : node->n_function->return_values)
-            ssignaure << '_' << n_return_value->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+            s_signaure << '_' << n_return_value->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
 
-        ssignaure << '_';
+        s_signaure << '_';
         for (auto n_parameter : node->n_function->parameters)
-            ssignaure << '_' << n_parameter->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+            s_signaure << '_' << n_parameter->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
 
         // Change asterisks (from pointer types) to periods to appease assembler.
-        std::string signature = ssignaure.str();
+        std::string signature = s_signaure.str();
         for (char& c : signature)
             if (c == '*')
                 c = '.';
@@ -618,6 +632,13 @@ namespace shl
         output() << "syscall\n";
 
         exchange_current_output(output_backup);
+    }
+
+    void generator::generate_function(function& function)
+    {
+        output_stream(_output.text, function.output) << '\n';
+        for (auto& nested_function : function.nested_functions)
+            generate_function(nested_function);
     }
 
     std::string generator::object::get_address() const

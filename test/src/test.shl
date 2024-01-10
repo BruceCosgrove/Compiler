@@ -15,10 +15,20 @@ bar: (ret: let; condition: let) = {
         return;
     }
     ret = 42;
+
+    foo: (x: let, y: let; a: let, b: let, c: let) = {
+        z: let = 6;
+        x = a / z + b;
+        y = b - c * z;
+
+        foo: (x: let) = {
+            foo: (; x: let) = { // nested functions with same name are ok as long as their local signatures are different.
+
+            }
+        }
+    }
+
+    func_foofoo: () = {}
 }
 
-foo: (x: let, y: let; a: let, b: let, c: let) = {
-    z: let = 6;
-    x = a / z + b;
-    y = b - c * z;
-}
+func_barbarbinks: () = {}
