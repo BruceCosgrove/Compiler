@@ -115,7 +115,7 @@ namespace shl
             // Convert the parameters.
             function.parameters.reserve(parameter_count);
             for (auto n_parameter : node->n_function->parameters)
-                function.parameters.emplace_back(n_parameter->n_name->value, stack_offset--);
+                function.parameters.emplace_back(n_parameter->n_declare_object->n_name->value, stack_offset--);
 
             g.with_output(function.output, [&]
             {
@@ -575,7 +575,7 @@ namespace shl
 
         s_signaure << '_';
         for (auto n_parameter : node->n_function->parameters)
-            s_signaure << '_' << n_parameter->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+            s_signaure << '_' << n_parameter->n_declare_object->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
 
         // Change asterisks (from pointer types) to periods to appease assembler.
         std::string signature = s_signaure.str();

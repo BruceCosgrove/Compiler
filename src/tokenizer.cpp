@@ -15,8 +15,7 @@ namespace shl
                 tokens.emplace_back(token_type::integer_literal_, line_number, get_column_count(), *token_value);
             else if (auto token_value = try_consume_identifier())
             {
-                     if (token_value == "let")    tokens.emplace_back(token_type::let_, line_number, get_column_count());
-                else if (token_value == "return") tokens.emplace_back(token_type::return_, line_number, get_column_count());
+                     if (token_value == "return") tokens.emplace_back(token_type::return_, line_number, get_column_count());
                 else if (token_value == "if")     tokens.emplace_back(token_type::if_, line_number, get_column_count());
                 else if (token_value == "elif")   tokens.emplace_back(token_type::elif_, line_number, get_column_count());
                 else if (token_value == "else")   tokens.emplace_back(token_type::else_, line_number, get_column_count());

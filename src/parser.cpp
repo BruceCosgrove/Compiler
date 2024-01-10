@@ -22,40 +22,41 @@ namespace shl
 
     node_declaration* parser::try_parse_declaration()
     {
-        if (auto n_identifier = try_parse_identifier())
+        if (auto n_name = try_parse_identifier())
         {
             auto n_declaration = _allocator.allocate<node_declaration>();
             try_consume(token_type::colon_, "Expected ':'");
-            if (try_consume(token_type::let_))
+            if (auto n_function = try_parse_function(true))
             {
-                if (try_consume(token_type::equals_))
-                {
-                    if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
-                        n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_object>(n_identifier, n_expression));
-                }
-                else
-                    n_declaration->n_value = _allocator.allocate<node_declare_object>(n_identifier);
-                try_consume(token_type::semicolon_, "Expected ';'");
-                return n_declaration;
-            }
-            else if (auto n_function = try_parse_function(true))
-            {
-                n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_named_function>(n_identifier, n_function));
+                n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_named_function>(n_name, n_function));
                 return n_declaration;
             }
             else
-                error(peek(), "Ill-formed declaration");
+            {
+                auto n_type = try_parse_identifier();
+                if (try_consume(token_type::equals_))
+                {
+                    if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
+                        n_declaration->n_value = _allocator.allocate<node_definition>(_allocator.allocate<node_define_object>(n_name, n_type, n_expression));
+                }
+                else
+                    n_declaration->n_value = _allocator.allocate<node_declare_object>(n_name);
+                try_consume(token_type::semicolon_, "Expected ';'");
+                return n_declaration;
+            }
         }
         return nullptr;
     }
 
-    node_declare_object* parser::try_parse_declare_object()
+    node_declare_object* parser::try_parse_declare_object(node_identifier* n_name, bool optional_type)
     {
-        if (auto n_identifier = try_parse_identifier())
+        if (n_name || (n_name = try_parse_identifier()))
         {
             try_consume(token_type::colon_, "Expected ':'");
-            try_consume(token_type::let_, "Expected \"let\"");
-            return _allocator.allocate<node_declare_object>(n_identifier);
+            auto n_type = try_parse_identifier();
+            if (!optional_type && !n_type) error(std::nullopt, "Expected identifier");
+            // If optional, the lack of a type identifier means auto.
+            return _allocator.allocate<node_declare_object>(n_name, n_type);
         }
         return nullptr;
     }
@@ -69,12 +70,12 @@ namespace shl
             {
                 auto n_function = _allocator.allocate<node_function>();
                 // Parse any return objects.
-                if (auto n_declare_object = try_parse_declare_object())
+                if (auto n_declare_object = try_parse_declare_object(nullptr, false))
                 {
                     n_function->return_values.push_back(n_declare_object);
                     while (try_consume(token_type::comma_))
                     {
-                        n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected return value declaration");
+                        n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected return value declaration", nullptr, false);
                         n_function->return_values.push_back(n_declare_object);
                     }
                 }
@@ -105,13 +106,12 @@ namespace shl
     node_parameter* parser::try_parse_parameter()
     {
         auto n_parameter_pass = try_parse_parameter_pass();
-        if (auto n_identifier = try_parse_identifier())
+        if (auto n_name = try_parse_identifier())
         {
             if (!n_parameter_pass) // Default parameter passing is in.
                 n_parameter_pass = _allocator.allocate<node_parameter_pass>(node_in());
-            try_consume(token_type::colon_, "Expected ':'");
-            try_consume(token_type::let_, "Expected \"let\"");
-            return _allocator.allocate<node_parameter>(n_parameter_pass, n_identifier);
+            auto n_declare_object = try_parse(&parser::try_parse_declare_object, "Expected object declaration", n_name, false);
+            return _allocator.allocate<node_parameter>(n_parameter_pass, n_declare_object);
         }
         else if (n_parameter_pass)
             error(peek(), "Expected identifier");

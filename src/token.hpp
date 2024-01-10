@@ -29,7 +29,6 @@ namespace shl
 
         // Correspondence: Non-trivial grammar rule case.
 
-        let_,
         return_,
         if_,
         elif_,

@@ -22,8 +22,7 @@ namespace shl
 
         [[nodiscard]] node_program* try_parse_program();
         [[nodiscard]] node_declaration* try_parse_declaration();
-        // [[nodiscard]] node_definition* try_parse_definition();
-        [[nodiscard]] node_declare_object* try_parse_declare_object();
+        [[nodiscard]] node_declare_object* try_parse_declare_object(node_identifier* n_name, bool optional_type);
         [[nodiscard]] node_function* try_parse_function(bool colon_consumed = false);
         [[nodiscard]] node_parameter* try_parse_parameter();
         [[nodiscard]] node_scope* try_parse_scope();

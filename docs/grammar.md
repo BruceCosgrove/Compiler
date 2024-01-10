@@ -14,9 +14,9 @@ $$
         \text{[named\_function]}; \\
     \end{cases} \\
 
-    \text{[declare\_variable]} &\to \text{[identifier]}:let \\
+    \text{[declare\_variable]} &\to \text{[identifier]}:\text{[identifier]} \\
 
-    \text{[define\_variable]} &\to \text{[identifier]}:let=\text{[expression]} \\
+    \text{[define\_variable]} &\to \text{[identifier]}:\text{[identifier]}?=\text{[expression]} \\
 
     \text{[function]} &\to
     \begin{cases}

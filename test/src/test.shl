@@ -1,34 +1,17 @@
 
-barbar: let = 50;
-barfoo: let = 100;
-foobar: let = 150;
-foofoo: let = 200;
+barbar := 50;
+barfoo := 100;
+foobar := 150;
+foofoo := 200;
+
+foo: (x: let, y: let; a: let, b: let, c: let) = {
+    z := 6;
+    x = a / z + b;
+    y = b - c * z;
+}
 
 main: (status: let; argc: let, argv: let) = {
+    //foo, bar := foo(1, 2, 3);
     barbar = foofoo;
     status = barbar;
 }
-
-bar: (ret: let; condition: let) = {
-    if condition {
-        ret = 64;
-        return;
-    }
-    ret = 42;
-
-    foo: (x: let, y: let; a: let, b: let, c: let) = {
-        z: let = 6;
-        x = a / z + b;
-        y = b - c * z;
-
-        foo: (x: let) = {
-            foo: (; x: let) = { // nested functions with same name are ok as long as their local signatures are different.
-
-            }
-        }
-    }
-
-    func_foofoo: () = {}
-}
-
-func_barbarbinks: () = {}

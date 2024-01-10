@@ -123,13 +123,13 @@ namespace shl
     struct node_declare_object
     {
         node_identifier* n_name;
-        // TODO: node_identifier* n_type;
+        node_identifier* n_type;
     };
 
     struct node_define_object
     {
         node_identifier* n_name;
-        // TODO: node_identifier* n_type;
+        node_identifier* n_type;
         node_expression* n_expression;
     };
 
@@ -149,8 +149,7 @@ namespace shl
     struct node_parameter
     {
         node_parameter_pass* n_pass;
-        node_identifier* n_name;
-        // TODO: node_identifier* n_type;
+        node_declare_object* n_declare_object;
     };
 
     struct node_scope
