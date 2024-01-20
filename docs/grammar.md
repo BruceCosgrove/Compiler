@@ -1,6 +1,7 @@
 $$
 \begin{align}
-    \text{Program} & \to \text{\{Declaration\}} \\
+    \text{Program} & \to
+        \text{\{Declaration\}} \\
 
     \text{Declaration} & \to
     \begin{cases}
@@ -14,13 +15,17 @@ $$
         \text{NamedFunction ``;"} \\
     \end{cases} \\
 
-    \text{DeclareVariable} & \to \text{Identifier ``:" }\text{Identifier} \\
+    \text{DeclareVariable} & \to
+        \text{Identifier ``:" Identifier} \\
 
-    \text{DefineVariable} & \to \text{Identifier ``:" }\text{[Identifier] ``=" }\text{Expression} \\
+    \text{DefineVariable} & \to
+        \text{Identifier ``:" [Identifier] ``=" Expression} \\
 
-    \text{NamedFunction} & \to \text{Identifier Function} \\
+    \text{NamedFunction} & \to
+        \text{Identifier Function} \\
 
-    \text{Function} & \to \text{``:" ``(" FunctionVariables ``)" Statement} \\
+    \text{Function} & \to
+        \text{``:" ``(" FunctionVariables ``)" Statement} \\
 
     \text{FunctionVariables} & \to
     \begin{cases}
@@ -28,33 +33,54 @@ $$
         \text{[ReturnValues] ``;" [Parameters]} \\
     \end{cases} \\
 
-    \text{ReturnValues} & \to \text{DeclareVariable \{``," DeclareVariable\}} \\
+    \text{ReturnValues} & \to
+        \text{DeclareVariable \{``," DeclareVariable\}} \\
 
-    \text{Parameter} & \to \text{[ParameterPass] DeclareVariable} \\
+    \text{Parameter} & \to
+        \text{[ParameterPass] DeclareVariable} \\
 
-    \text{Parameters} & \to \text{Parameter \{``," Parameter\}} \\
+    \text{Parameters} & \to
+        \text{Parameter \{``," Parameter\}} \\
 
-    \text{Scope} & \to \text{``\{" [ScopedStatement] ``\}"} \\
+    \text{Scope} & \to
+        \text{``\{" [ScopedStatement] ``\}"} \\
 
     \text{ScopedStatement} & \to
     \begin{cases}
         \text{Statement} \\
         \text{Declaration} \\
-        \text{If \{Elif\}[Else]} \\
+        \text{If \{Elif\} [Else]} \\
+        \text{While \{Elif\} [Else]} \\
     \end{cases} \\
 
     \text{Statement} & \to
     \begin{cases}
+        \text{``;"} \\
         \text{Scope} \\
         \text{``return" ``;"} \\
         \text{Identifier ``=" Expression ``;"} \\
     \end{cases} \\
 
-    \text{If} & \to \text{``if" Expression Statement} \\
+    \text{If} & \to
+        \text{``if" ``(" [DeclareOrDefineVariables ``;"] Expression ``)" Statement} \\
 
-    \text{Elif} & \to \text{``elif" Expression Statement} \\
+    \text{Elif} & \to
+        \text{``elif" ``(" [DeclareOrDefineVariables ``;"] Expression ``)" Statement} \\
 
-    \text{Else} & \to \text{``else" Statement} \\
+    \text{Else} & \to
+        \text{``else" Statement} \\
+
+    \text{While} & \to
+        \text{(``dowhile" | ``while") ``(" [DeclareOrDefineVariables] ``;" [Expression] ``;" [Expressions] ``)" Statement} \\
+
+    \text{DeclareOrDefineVariables} & \to
+        \text{DeclareOrDefineVariable \{``," DeclareOrDefineVariable\}} \\
+
+    \text{DeclareOrDefineVariable} & \to
+        \text{(DeclareVariable | DefineVariable)} \\
+
+    \text{Expressions} & \to
+        \text{Expression \{``," Expression\}} \\
 
     \text{Expression} & \to
     \begin{cases}
@@ -87,8 +113,10 @@ $$
         \text{``move"} \\
     \end{cases} \\
 
-    \text{IntegerLiteral} & \to \text{\textbackslash d\{\textbackslash d\}} \\
+    \text{IntegerLiteral} & \to
+        \text{\textbackslash d\{\textbackslash d\}} \\
 
-    \text{Identifier} & \to \text{\textbackslash w\{(\textbackslash w|\textbackslash d)\}} \\
+    \text{Identifier} & \to
+        \text{\textbackslash w\{(\textbackslash w|\textbackslash d)\}} \\
 \end{align}
 $$
