@@ -8,8 +8,8 @@ TEST_DIR := test/
 # To set directly, use "make cfg=debug" or "make cfg=release".
 cfg := debug
 
-# Configurations
-
+# The compiler flags to use.
+CXXFLAGS := -std=c++23 -Wall
 CXXFLAGS.debug := -g
 CXXFLAGS.release := -O2
 
@@ -35,8 +35,8 @@ EXE := $(OUT_DIR)$(OUT_NAME)
 
 # The compiler to use.
 COMPILER := g++-13
-# The compiler flags to use.
-CXXFLAGS := -std=c++23 -Wall $(CXXFLAGS.$(cfg))
+# Add the configuration-specific compiler flags.
+CXXFLAGS += $(CXXFLAGS.$(cfg))
 
 # Compile the executable.
 all: $(EXE) $(MAKEFILE)
@@ -63,15 +63,15 @@ $(DIRS):
 run: $(EXE)
 	$(MAKE) cfg=$(cfg) -C $(TEST_DIR) run
 
-# Clears the terminal.
-.PHONY: clear
-clear:
-	clear
+# Clears the terminal and compiles the necessary files.
+# If successful, also runs the test.
+.PHONY: crun
+crun: clean run
 
 # Clears the terminal and recompiles everything.
 # If successful, also runs the test.
-.PHONY: crun
-crun: clean clear run
+.PHONY: ccrun
+ccrun: clear clean run
 
 # Debugs the test.
 .PHONY: rund
@@ -83,3 +83,8 @@ rund: $(EXE)
 clean:
 	rm -rf $(OUT_DIR_ROOT) $(INT_DIR_ROOT)
 	$(MAKE) cfg=$(cfg) -C $(TEST_DIR) clean
+
+# Clears the terminal.
+.PHONY: clear
+clear:
+	clear
