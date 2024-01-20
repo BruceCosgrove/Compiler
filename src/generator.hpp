@@ -1,6 +1,8 @@
 #pragma once
 
+#include "function.hpp"
 #include "input.hpp"
+#include "namespaces.hpp"
 #include "token_nodes.hpp"
 #include <sstream>
 #include <string>
@@ -8,7 +10,8 @@
 
 namespace shl
 {
-    struct generator_visitor; // implementation
+    struct generator_pass1;
+    struct generator_pass2;
 
     class generator
     {
@@ -16,42 +19,6 @@ namespace shl
         [[nodiscard]] explicit generator(node_program* root) : _root(root) {}
 
         [[nodiscard]] std::string operator()();
-
-    private:
-        struct object
-        {
-            // The name of the object.
-            // When stack_offset is zero, this also serves as its address (with an underscore appended).
-            std::string_view name;
-            // The offset into the stack where this object resides.
-            // If zero, this object is not on the stack.
-            std::ptrdiff_t stack_offset = 0;
-
-            // 0 (and 1 if rbp is pushed), are invalid stack offsets for functions.
-            // 0 is guaranteed to be invalid, but not 1, so 0 is instead used to
-            // say this object is not inside a function. This may mean it's static/
-            // in the global scope, thread_local, or maybe something else.
-            [[nodiscard]] constexpr bool is_static() const noexcept { return stack_offset == 0; }
-
-            // Returns the address of the object.
-            // If this object is in a function, returns "rsp+/-stack_offset".
-            // Otherwise, returns the name of this object with an appended underscore,
-            // which is a label in the data section, i.e. an address to this object.
-            [[nodiscard]] std::string get_address() const;
-        };
-
-        struct function
-        {
-            std::string_view name;
-            std::string signature;
-            std::string namespace_;
-            std::vector<object> return_values;
-            std::vector<object> parameters;
-            std::vector<object> objects;
-            std::vector<object> static_objects;
-            std::vector<function> nested_functions;
-            std::stringstream output;
-        };
 
     private:
         // Optionally outputs appropriate indentation for instructions to the current output stream.
@@ -80,21 +47,18 @@ namespace shl
         }
 
     private:
-        // Selects which generation function to call next.
-        template <class Visitor>
-        void visit(Visitor* visitor, std::string_view name, const nodes& variant)
-        {
-            IF_VERBOSE(input::verbose_level::indentation) output() << "; " << name << ": ";
-            ++_output.indent_level;
-            std::visit(*visitor, variant);
-            --_output.indent_level;
-        }
+        friend struct generator_pass1;
+        void visit1(generator_pass1* pass, const nodes& variant);
+
+        friend struct generator_pass2;
+        void visit2(generator_pass2* pass, std::string_view name, const nodes& variant);
 
         // Allocates a new scope frame.
         void begin_scope();
 
         // Deallocates the top scope frame and any variables local in it.
-        void end_scope();
+        // Returns the number of bytes to deallocate.
+        std::ptrdiff_t end_scope();
 
     private:
         // Creates a global object in bss.
@@ -112,6 +76,7 @@ namespace shl
         [[nodiscard]] object* get_object(std::string_view name);
         [[nodiscard]] function* get_function_from_name(std::string_view name);
         [[nodiscard]] function* get_function_from_signature(std::string_view name);
+        // Only works in pass1.
         [[nodiscard]] inline function& get_current_function();
         [[nodiscard]] inline bool has_current_function() const noexcept;
 
@@ -119,16 +84,14 @@ namespace shl
         // As long as short_name is at most 5 characters, this never allocates due to std::string's SSBO.
         [[nodiscard]] static std::string create_label(std::string_view short_name = "label") noexcept;
 
-        // Creates a function's signature. This likely allocates.
-        [[nodiscard]] std::string create_function_signature(const node_named_function* node);
+        // Creates a function's signature by (likely) allocating a string.
+        [[nodiscard]] std::string create_function_signature(const std::string& current_namespace, const node_named_function* node);
 
     private:
         // Generates the pre-entrypoint function if main is defined.
         void generate_start();
         // Generates a function and its nested functions.
         void generate_function(function& function);
-
-        friend struct generator_visitor;
 
     private:
         // Input
@@ -155,8 +118,8 @@ namespace shl
 
         // Compilation state.
 
-        // List of nested function signatures.
-        std::vector<std::string_view> _nested_function_signatures;
+        // List of nested namespaces.
+        namespaces _nested_namespaces;
         // List of functions generated/being generated thus far.
         std::vector<function> _functions;
         // List of uninitialized aka static objects.

@@ -24,32 +24,28 @@
 
 namespace shl
 {
-    struct generator_visitor
+    struct generator_pass1
     {
         generator& g; // context
 
         void operator()(const node_program* node)
         {
-            VERBOSE_OUT(input::verbose_level::indentation, "program\n", true);
-            for (auto node : node->declarations)
-                g.visit(this, "program", cast_variant<NODE_TYPES>(node->n_value));
+            for (auto declaration : node->declarations)
+                g.visit1(this, cast_variant<NODE_TYPES>(declaration->n_value));
         }
 
         void operator()(const node_declaration* node)
         {
-            VERBOSE_OUT(input::verbose_level::indentation, "declaration\n", true);
-            g.visit(this, "declaration", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_definition* node)
         {
-            VERBOSE_OUT(input::verbose_level::indentation, "definition\n", true);
-            g.visit(this, "definition", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_declare_object* node)
         {
-            VERBOSE_OUT(input::verbose_level::indentation, "declare object\n", true);
             if (g.has_current_function())
                 g.create_object(node->n_name->value, false);
             else
@@ -61,25 +57,257 @@ namespace shl
 
         void operator()(const node_define_object* node)
         {
-            VERBOSE_OUT(input::verbose_level::indentation, "define object\n", true);
-
             if (g.has_current_function())
+                g.create_object(node->n_name->value, false);
+            else // TODO: if the expression is constexpr, create an initialized object instead of an uninitialized one.
+                g.create_uninitialized(node->n_name->value);
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression->n_value));
+        }
+
+        void operator()(const node_function* node)
+        {
+            assert(false && "unnamed function unimplemented.");
+        }
+
+        void operator()(const node_named_function* node)
+        {
+            auto& current_namespace = g._nested_namespaces.get_namespace();
+            auto signature = g.create_function_signature(current_namespace, node);
+            if (g.get_function_from_signature(signature)) error_exit("Generator", "Redefined function");
+
+            auto& functions = g.has_current_function() ? g.get_current_function().nested_functions : g._functions;
+            auto& function = functions.emplace_back(node->n_name->value, std::move(signature));
+            g._nested_namespaces.push_namespace(static_cast<std::string_view>(function.signature).substr(current_namespace.size()));
+
+            std::size_t return_value_count = node->n_function->return_values.size();
+            std::size_t parameter_count = node->n_function->parameters.size();
+            std::size_t stack_offset = return_value_count + parameter_count + 1; // + 1 only if push rbp
+
+            // Convert the return values.
+            function.return_values.reserve(return_value_count);
+            for (auto n_return_value : node->n_function->return_values)
+                function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
+
+            // Convert the parameters.
+            function.parameters.reserve(parameter_count);
+            for (auto n_parameter : node->n_function->parameters)
+                function.parameters.emplace_back(n_parameter->n_declare_object->n_name->value, stack_offset--);
+
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_function->n_statement->n_value));
+            g._nested_namespaces.pop_namespace();
+        }
+
+        void operator()(const node_parameter* node)
+        {
+            // TODO: how is this working? did i forget to use it?
+            assert(false && "parameter unimplemented.");
+        }
+
+        void operator()(const node_scope* node)
+        {
+            g.begin_scope();
+            for (auto n_scoped_statement : node->scoped_statements)
+                g.visit1(this, cast_variant<NODE_TYPES>(n_scoped_statement->n_value));
+            g.end_scope();
+        }
+
+        void operator()(const node_statement* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_scoped_statement* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_expression* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_term* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_return* node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_if* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_statement->n_value));
+        }
+
+        void operator()(const node_reassign* node)
+        {
+            auto object = g.get_object(node->n_identifier->value);
+            if (!object) ERROR_EXIT("Generator", "Undefined object \"" << node->n_identifier->value << '"');
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression->n_value));
+        }
+
+        void operator()(const node_scoped_if* node)
+        {
+            std::size_t i = 0;
+            do g.visit1(this, cast_variant<NODE_TYPES>(node->ifs[i++]->n_statement->n_value));
+            while (i < node->ifs.size());
+        }
+
+        void operator()(const node_binary_expression* node)
+        {
+            bool expand_lhs = std::holds_alternative<node_binary_expression*>(node->n_expression_lhs->n_value) ||
+                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
+            bool expand_rhs = std::holds_alternative<node_binary_expression*>(node->n_expression_rhs->n_value) ||
+                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
+
+            if (!expand_lhs && expand_rhs) // lhs is a leaf, but rhs is not
             {
-                auto& object = g.create_object(node->n_name->value, false);
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
-                g.output() << "mov [" << object.get_address() << "], rax";
-                VERBOSE_COMMENT(node->n_name->value, true);
-                g.output(false) << '\n';
+                g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value)); // compute rhs first
+                g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
             }
             else
             {
-                // TODO: if the expression is constexpr, create an initialized object instead.
-                auto& object = g.create_uninitialized(node->n_name->value);
+                g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value)); // compute lhs first
+                g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
+            }
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+        }
+
+        void operator()(const node_parenthesised_expression* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_expression->n_value));
+        }
+
+        void operator()(const node_binary_operator* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_parameter_pass* node)
+        {
+            g.visit1(this, cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_integer_literal* node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_identifier* node)
+        {
+            auto object = g.get_object(node->value);
+            if (!object) error_exit("Generator", "Undeclared identifier");
+        }
+
+        void operator()(const node_forward_slash& node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_percent& node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_asterisk& node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_plus& node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_minus& node)
+        {
+            // Explicitly nothing.
+        }
+
+        void operator()(const node_in& node)
+        {
+            assert(false && "in unimplemented.");
+        }
+
+        void operator()(const node_out& node)
+        {
+            assert(false && "out unimplemented.");
+        }
+
+        void operator()(const node_inout& node)
+        {
+            assert(false && "inout unimplemented.");
+        }
+
+        void operator()(const node_copy& node)
+        {
+            assert(false && "copy unimplemented.");
+        }
+
+        void operator()(const node_move& node)
+        {
+            assert(false && "move unimplemented.");
+        }
+    };
+
+    struct generator_pass2
+    {
+        generator& g; // context
+
+        void operator()(const node_program* node)
+        {
+            VERBOSE_OUT(input::verbose_level::indentation, "program\n", true);
+            for (auto declaration : node->declarations)
+                g.visit2(this, "program", cast_variant<NODE_TYPES>(declaration->n_value));
+        }
+
+        void operator()(const node_declaration* node)
+        {
+            VERBOSE_OUT(input::verbose_level::indentation, "declaration\n", true);
+            g.visit2(this, "declaration", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_definition* node)
+        {
+            VERBOSE_OUT(input::verbose_level::indentation, "definition\n", true);
+            g.visit2(this, "definition", cast_variant<NODE_TYPES>(node->n_value));
+        }
+
+        void operator()(const node_declare_object* node)
+        {
+            VERBOSE_OUT(input::verbose_level::indentation, "declare object\n", true);
+            if (g.has_current_function())
+                g.output() << "sub rsp, " << generator::elem_size << '\n';
+            else
+                assert(false && "declaring static objects unimplemented.");
+                // TODO: if next defining an object with the same name, it must be made initialized.
+                // If it's not initialized by the end of generation, the program is ill-formed.
+                // g.create_uninitialized(node->n_name->value);
+        }
+
+        void operator()(const node_define_object* node)
+        {
+            VERBOSE_OUT(input::verbose_level::indentation, "define object\n", true);
+
+            auto object = g.get_object(node->n_name->value);
+            assert(object);
+            if (object->is_static())
+            {
                 g.with_output(g._output.uninitialized_static_construct, [&]
                 {
-                    g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
-                    g.output() << "mov [" << object.get_address() << "], rax\n";
+                    g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+                    g.output() << "mov [" << object->get_address() << "], rax\n";
                 });
+            }
+            else
+            {
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+                g.output() << "mov [" << object->get_address() << "], rax";
+                VERBOSE_COMMENT(node->n_name->value, true);
+                g.output(false) << '\n';
             }
         }
 
@@ -93,42 +321,24 @@ namespace shl
         {
             VERBOSE_OUT(input::verbose_level::indentation, "named function\n", true);
 
-            std::stringstream s_namespace;
-            for (std::string_view nested_signature : g._nested_function_signatures)
-                s_namespace << nested_signature << ".."; // The .. replaces :: (namespace resolution operator).
-            std::string signature = g.create_function_signature(node);
-            if (g.get_function_from_signature(signature)) error_exit("Generator", "Redefined function");
+            auto& current_namespace = g._nested_namespaces.get_namespace();
+            std::string signature = g.create_function_signature(current_namespace, node);
+            auto function = g.get_function_from_signature(signature);
+            assert(function);
 
-            auto& functions = g.has_current_function() ? g.get_current_function().nested_functions : g._functions;
-            auto& function = functions.emplace_back(node->n_name->value, std::move(signature), std::move(s_namespace).str());
-            g._nested_function_signatures.push_back(function.signature);
+            g._nested_namespaces.push_namespace(static_cast<std::string_view>(function->signature).substr(current_namespace.size()));
 
-            std::ptrdiff_t return_value_count = node->n_function->return_values.size();
-            std::ptrdiff_t parameter_count = node->n_function->parameters.size();
-            std::ptrdiff_t stack_offset = return_value_count + parameter_count + 1; // + 1 only if push rbp
-
-            // Convert the return values.
-            function.return_values.reserve(return_value_count);
-            for (auto n_return_value : node->n_function->return_values)
-                function.return_values.emplace_back(n_return_value->n_name->value, stack_offset--);
-
-            // Convert the parameters.
-            function.parameters.reserve(parameter_count);
-            for (auto n_parameter : node->n_function->parameters)
-                function.parameters.emplace_back(n_parameter->n_declare_object->n_name->value, stack_offset--);
-
-            g.with_output(function.output, [&]
+            g.with_output(function->output, [&]
             {
-                // TODO: dont allocate this
-                g.output_label(function.namespace_ + function.signature) << '\n';
+                g.output_label(function->signature) << '\n';
                 g.output() << "push rbp\n";
                 g.output() << "mov rbp, rsp\n";
-                g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_function->n_statement->n_value));
+                g.visit2(this, "statement", cast_variant<NODE_TYPES>(node->n_function->n_statement->n_value));
                 g.output() << "pop rbp\n";
                 g.output() << "ret\n";
             });
 
-            g._nested_function_signatures.pop_back();
+            g._nested_namespaces.pop_namespace();
         }
 
         void operator()(const node_parameter* node)
@@ -142,32 +352,33 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "scope\n", true);
             g.begin_scope();
             for (auto n_scoped_statement : node->scoped_statements)
-                g.visit(this, "scoped statement", cast_variant<NODE_TYPES>(n_scoped_statement->n_value));
-            g.end_scope();
+                g.visit2(this, "scoped statement", cast_variant<NODE_TYPES>(n_scoped_statement->n_value));
+            if (std::ptrdiff_t pop_size = g.end_scope())
+                g.output() << "add rsp, " << pop_size << '\n';
         }
 
         void operator()(const node_statement* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "statement\n", true);
-            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "statement", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_scoped_statement* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "scoped statement\n", true);
-            g.visit(this, "scoped statement", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "scoped statement", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_expression* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "expression\n", true);
-            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_term* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "term\n", true);
-            g.visit(this, "term", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "term", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_return* node)
@@ -180,11 +391,11 @@ namespace shl
         void operator()(const node_if* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "if\n", true);
-            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
             std::string label_end_if = g.create_label();
             g.output() << "test rax, rax\n";
             g.output() << "jz " << label_end_if << '\n';
-            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_statement->n_value));
+            g.visit2(this, "statement", cast_variant<NODE_TYPES>(node->n_statement->n_value));
             g.output_label(label_end_if);
             VERBOSE_COMMENT("endif", true) << '\n';
         }
@@ -194,9 +405,9 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "reassign\n", true);
 
             auto object = g.get_object(node->n_identifier->value);
-            if (!object) ERROR_EXIT("Generator", "Undefined object \"" << node->n_identifier->value << '"');
+            assert(object);
 
-            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
             g.output() << "mov [" << object->get_address() << "], rax";
             if (!object->is_static())
                 VERBOSE_COMMENT(node->n_identifier->value, true);
@@ -216,11 +427,11 @@ namespace shl
                 auto n_if = node->ifs[i++];
                 if (n_if->n_expression) // Only else blocks won't enter here.
                 {
-                    g.visit(this, "expression", cast_variant<NODE_TYPES>(n_if->n_expression->n_value));
+                    g.visit2(this, "expression", cast_variant<NODE_TYPES>(n_if->n_expression->n_value));
                     g.output() << "test rax, rax\n";
                     g.output() << "jz " << label_next_if << '\n';
                 }
-                g.visit(this, "statement", cast_variant<NODE_TYPES>(n_if->n_statement->n_value));
+                g.visit2(this, "statement", cast_variant<NODE_TYPES>(n_if->n_statement->n_value));
                 if (i < node->ifs.size())
                 {
                     g.output() << "jmp " << label_end_if << '\n';
@@ -246,46 +457,46 @@ namespace shl
 
             if (!expand_lhs && !expand_rhs) // both are leaves
             {
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
                 g.output() << "mov rbx, rax\n";
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
-                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
+                g.visit2(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
             }
             else if (!expand_lhs) // lhs is a leaf, but rhs is not
             {
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value)); // compute rhs first
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value)); // compute rhs first
                 g.output() << "push rax\n";
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
                 g.output() << "pop rbx\n";
-                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+                g.visit2(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
             }
             else
             {
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_lhs->n_value));
                 g.output() << "push rax\n";
-                g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
+                g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression_rhs->n_value));
                 g.output() << "mov rbx, rax\n";
                 g.output() << "pop rax\n";
-                g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
+                g.visit2(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
             }
         }
 
         void operator()(const node_parenthesised_expression* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "parenthesised expression\n", true);
-            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
+            g.visit2(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
         }
 
         void operator()(const node_binary_operator* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "binary operator\n", true);
-            g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "binary operator", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_parameter_pass* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "parameter pass\n", true);
-            g.visit(this, "parameter pass", cast_variant<NODE_TYPES>(node->n_value));
+            g.visit2(this, "parameter pass", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_integer_literal* node)
@@ -299,7 +510,7 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "identifier\n", true);
 
             auto object = g.get_object(node->value);
-            if (!object) error_exit("Generator", "Undeclared identifier");
+            assert(object);
 
             g.output() << "mov rax, QWORD [" << object->get_address() << "]";
             if (!object->is_static())
@@ -367,8 +578,10 @@ namespace shl
     std::string generator::operator()()
     {
         // Generate everything.
-        generator_visitor visitor(*this);
-        visit(&visitor, "program", nodes(_root));
+        generator_pass1 pass1(*this);
+        visit1(&pass1, nodes(_root));
+        generator_pass2 pass2(*this);
+        visit2(&pass2, "program", nodes(_root));
         generate_start();
 
         // Output bss.
@@ -442,20 +655,34 @@ namespace shl
         return destination;
     }
 
+    void generator::visit1(generator_pass1* pass, const nodes& variant)
+    {
+        ++_output.indent_level;
+        std::visit(*pass, variant);
+        --_output.indent_level;
+    }
+
+    void generator::visit2(generator_pass2* pass, std::string_view name, const nodes& variant)
+    {
+        IF_VERBOSE(input::verbose_level::indentation) output() << "; " << name << ": ";
+        ++_output.indent_level;
+        std::visit(*pass, variant);
+        --_output.indent_level;
+    }
+
     void generator::begin_scope()
     {
         _scopes.push_back(get_current_function().objects.size());
     }
 
-    void generator::end_scope()
+    std::ptrdiff_t generator::end_scope()
     {
         auto& objects = get_current_function().objects;
-        if (std::size_t pop_count = objects.size() - _scopes.back())
-        {
-            output() << "add rsp, " << (pop_count * elem_size) << '\n';
+        std::size_t pop_count = objects.size() - _scopes.back();
+        if (pop_count)
             objects.erase(objects.end() - pop_count, objects.end());
-        }
         _scopes.pop_back();
+        return pop_count * elem_size;
     }
 
     auto generator::create_uninitialized(std::string_view name) -> object&
@@ -485,7 +712,6 @@ namespace shl
         {
             auto& objects = get_current_function().objects;
             auto& object = objects.emplace_back(name, -(1 + objects.size())); // +1 for push rbp
-            output() << "sub rsp, " << elem_size << '\n';
             return object;
         }
         else
@@ -551,7 +777,7 @@ namespace shl
 
     bool generator::has_current_function() const noexcept
     {
-        return !_nested_function_signatures.empty();
+        return !_nested_namespaces.empty();
     }
 
     std::string generator::create_label(std::string_view short_name) noexcept
@@ -564,21 +790,29 @@ namespace shl
         return std::string(short_name) + std::to_string(_label_count++);
     }
 
-    std::string generator::create_function_signature(const node_named_function* node)
+    std::string generator::create_function_signature(const std::string& current_namespace, const node_named_function* node)
     {
-        std::stringstream s_signaure;
-        s_signaure << node->n_name->value;
+        std::string signature;
 
-        s_signaure << '_';
+        // Calculate the length to allocate at most once.
+        std::size_t length = current_namespace.size() + node->n_name->value.size() + 2;
         for (auto n_return_value : node->n_function->return_values)
-            s_signaure << '_' << n_return_value->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+            length += n_return_value->n_name->value.size() + 1;
+        for (auto n_return_value : node->n_function->parameters)
+            length += n_return_value->n_declare_object->n_name->value.size() + 1;
+        signature.reserve(length);
 
-        s_signaure << '_';
+        signature += node->n_name->value;
+
+        signature += '_';
+        for (auto n_return_value : node->n_function->return_values)
+            (signature += '_') += n_return_value->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+
+        signature += '_';
         for (auto n_parameter : node->n_function->parameters)
-            s_signaure << '_' << n_parameter->n_declare_object->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
+            (signature += '_') += n_parameter->n_declare_object->n_name->value; // TODO: When types are implemented, change "n_name" to "n_type".
 
         // Change asterisks (from pointer types) to periods to appease assembler.
-        std::string signature = s_signaure.str();
         for (char& c : signature)
             if (c == '*')
                 c = '.';
@@ -639,27 +873,5 @@ namespace shl
         output_stream(_output.text, function.output) << '\n';
         for (auto& nested_function : function.nested_functions)
             generate_function(nested_function);
-    }
-
-    std::string generator::object::get_address() const
-    {
-        std::string address;
-        if (!is_static())
-        {
-            address = "rbp";
-            if (std::ptrdiff_t rsp_offset = std::abs(stack_offset * elem_size))
-            {
-                address += ' ';
-                address += (stack_offset > 0 ? '+' : '-');
-                address += ' ';
-                address += std::to_string(rsp_offset);
-            }
-        }
-        else
-        {
-            address = name;
-            address += '_';
-        }
-        return address;
     }
 } // namespace shl
