@@ -36,14 +36,14 @@ $$
     \text{ReturnValues} & \to
         \text{DeclareVariable \{``," DeclareVariable\}} \\
 
-    \text{Parameter} & \to
-        \text{[ParameterPass] DeclareVariable} \\
-
     \text{Parameters} & \to
         \text{Parameter \{``," Parameter\}} \\
 
+    \text{Parameter} & \to
+        \text{[ParameterPass] DeclareVariable} \\
+
     \text{Scope} & \to
-        \text{``\{" [ScopedStatement] ``\}"} \\
+        \text{``\{" \{ScopedStatement\} ``\}"} \\
 
     \text{ScopedStatement} & \to
     \begin{cases}
@@ -57,6 +57,7 @@ $$
     \begin{cases}
         \text{``;"} \\
         \text{Scope} \\
+        \text{If} \\
         \text{``return" ``;"} \\
         \text{Identifier ``=" Expression ``;"} \\
     \end{cases} \\
