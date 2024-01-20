@@ -1,84 +1,122 @@
 $$
 \begin{align}
-    \text{[program]} &\to \text{[declaration]}^* \\
+    \text{Program} & \to
+        \text{\{Declaration\}} \\
 
-    \text{[declaration]} &\to
+    \text{Declaration} & \to
     \begin{cases}
-        \text{[definition]} \\
-        \text{[declare\_variable]}; \\
+        \text{Definition} \\
+        \text{DeclareVariable ``;"} \\
     \end{cases} \\
 
-    \text{[definition]} &\to
+    \text{Definition} & \to
     \begin{cases}
-        \text{[define\_variable]}; \\
-        \text{[named\_function]}; \\
+        \text{DefineVariable ``;"} \\
+        \text{NamedFunction ``;"} \\
     \end{cases} \\
 
-    \text{[declare\_variable]} &\to \text{[identifier]}:\text{[identifier]} \\
+    \text{DeclareVariable} & \to
+        \text{Identifier ``:" Identifier} \\
 
-    \text{[define\_variable]} &\to \text{[identifier]}:\text{[identifier]}?=\text{[expression]} \\
+    \text{DefineVariable} & \to
+        \text{Identifier ``:" [Identifier] ``=" Expression} \\
 
-    \text{[function]} &\to
+    \text{NamedFunction} & \to
+        \text{Identifier Function} \\
+
+    \text{Function} & \to
+        \text{``:" ``(" FunctionVariables ``)" Statement} \\
+
+    \text{FunctionVariables} & \to
     \begin{cases}
-        :\text{([declare\_variable]}^*\text{;}?\text{)[statement]} \\
-        :\text{([declare\_variable]}^*\text{;[parameter]}^+\text{)[statement]} \\
+        \text{[ReturnValues] [``;"]} \\
+        \text{[ReturnValues] ``;" [Parameters]} \\
     \end{cases} \\
 
-    \text{[named\_function]} &\to \text{[identifier]}\text{[function]}\\
+    \text{ReturnValues} & \to
+        \text{DeclareVariable \{``," DeclareVariable\}} \\
 
-    \text{[parameter]} &\to \text{[parameter\_pass]}?\space\text{[identifier]}:\text{[identifier]} \\
+    \text{Parameter} & \to
+        \text{[ParameterPass] DeclareVariable} \\
 
-    \text{[scope]} &\to \{\text{[scoped\_statement]}^*\} \\
+    \text{Parameters} & \to
+        \text{Parameter \{``," Parameter\}} \\
 
-    \text{[statement]} &\to
+    \text{Scope} & \to
+        \text{``\{" [ScopedStatement] ``\}"} \\
+
+    \text{ScopedStatement} & \to
     \begin{cases}
-        \text{[scope]} \\
-        return; \\
-        \text{[identifier]}=\text{[expression]}; \\
+        \text{Statement} \\
+        \text{Declaration} \\
+        \text{If \{Elif\} [Else]} \\
+        \text{While \{Elif\} [Else]} \\
     \end{cases} \\
 
-    \text{[scoped\_statement]} &\to
+    \text{Statement} & \to
     \begin{cases}
-        \text{[statement]} \\
-        \text{[declaration]} \\
-        \text{[if]}(elif\space\text{[expression]}\text{[statement]})^*(else\space\text{[expression]}\text{[statement]})? \\
+        \text{``;"} \\
+        \text{Scope} \\
+        \text{``return" ``;"} \\
+        \text{Identifier ``=" Expression ``;"} \\
     \end{cases} \\
 
-    \text{[if]} &\to if\space\text{[expression]}\text{[statement]} \\
+    \text{If} & \to
+        \text{``if" ``(" [DeclareOrDefineVariables ``;"] Expression ``)" Statement} \\
 
-    \text{[expression]} &\to
+    \text{Elif} & \to
+        \text{``elif" ``(" [DeclareOrDefineVariables ``;"] Expression ``)" Statement} \\
+
+    \text{Else} & \to
+        \text{``else" Statement} \\
+
+    \text{While} & \to
+        \text{(``dowhile" | ``while") ``(" [DeclareOrDefineVariables] ``;" [Expression] ``;" [Expressions] ``)" Statement} \\
+
+    \text{DeclareOrDefineVariables} & \to
+        \text{DeclareOrDefineVariable \{``," DeclareOrDefineVariable\}} \\
+
+    \text{DeclareOrDefineVariable} & \to
+        \text{(DeclareVariable | DefineVariable)} \\
+
+    \text{Expressions} & \to
+        \text{Expression \{``," Expression\}} \\
+
+    \text{Expression} & \to
     \begin{cases}
-        \text{[term]} \\
-        \text{[expression]}\text{[operator]}\text{[expression]} \\
+        \text{Term} \\
+        \text{Expression Operator Expression} \\
     \end{cases} \\
 
-    \text{[term]} &\to
+    \text{Term} & \to
     \begin{cases}
-        \text{[integer\_literal]} \\
-        \text{[identifier]} \\
-        \text{([expression])} \\
+        \text{IntegerLiteral} \\
+        \text{Identifier} \\
+        \text{``(" Expression ``)"} \\
     \end{cases} \\
 
-    \text{[operator]} &\to
+    \text{Operator} & \to
     \begin{cases}
-        \text{/} & \text{precedence 1} \\
-        \text{\%} & \text{precedence 1} \\
-        \text{*} & \text{precedence 1} \\
-        \text{+} & \text{precedence 0} \\
-        \text{-} & \text{precedence 0} \\
+        \text{``/"} & \text{precedence 1} \\
+        \text{``\%"} & \text{precedence 1} \\
+        \text{``*"} & \text{precedence 1} \\
+        \text{``+"} & \text{precedence 0} \\
+        \text{``-"} & \text{precedence 0} \\
     \end{cases} \\
 
-    \text{[parameter\_pass]} &\to
+    \text{ParameterPass} & \to
     \begin{cases}
-        in & \text{default} \\
-        out \\
-        inout \\
-        copy \\
-        move \\
+        \text{``in"} & \text{default} \\
+        \text{``out"} \\
+        \text{``inout"} \\
+        \text{``copy"} \\
+        \text{``move"} \\
     \end{cases} \\
 
-    \text{[integer\_literal]} &\to [0-9]^* \\
+    \text{IntegerLiteral} & \to
+        \text{\textbackslash d\{\textbackslash d\}} \\
 
-    \text{[identifier]} &\to [a-zA-Z\_][a-zA-Z0-9\_]^* \\
+    \text{Identifier} & \to
+        \text{\textbackslash w\{(\textbackslash w|\textbackslash d)\}} \\
 \end{align}
 $$
