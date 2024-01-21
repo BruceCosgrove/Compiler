@@ -133,6 +133,8 @@ namespace shl
 
     node_statement* parser::try_parse_statement()
     {
+        if (try_consume(token_type::semicolon_))
+            return _allocator.allocate<node_statement>();
         if (auto n_scope = try_parse_scope())
             return _allocator.allocate<node_statement>(n_scope);
         if (auto n_if = try_parse_if())

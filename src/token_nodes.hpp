@@ -64,6 +64,7 @@ namespace shl
 
     // All node types.
     #define NODE_TYPES \
+        std::monostate, \
         node_program*, \
         node_declaration*, \
         node_definition*, \
@@ -157,7 +158,7 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_scope*, node_if*, node_return*, node_reassign*> n_value;
+        std::variant<std::monostate, node_scope*, node_if*, node_return*, node_reassign*> n_value;
     };
 
     struct node_scoped_statement

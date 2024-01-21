@@ -28,6 +28,8 @@ namespace shl
     {
         generator& g; // context
 
+        void operator()(std::monostate) {}
+
         void operator()(const node_program* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "program\n", true);
@@ -149,7 +151,8 @@ namespace shl
         void operator()(const node_statement* node)
         {
             VERBOSE_OUT(input::verbose_level::indentation, "statement\n", true);
-            g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_value));
+            if (!std::holds_alternative<std::monostate>(node->n_value))
+                g.visit(this, "statement", cast_variant<NODE_TYPES>(node->n_value));
         }
 
         void operator()(const node_scoped_statement* node)
