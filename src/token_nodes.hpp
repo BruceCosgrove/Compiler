@@ -157,7 +157,7 @@ namespace shl
 
     struct node_statement
     {
-        std::variant<node_scope*, node_return*, node_reassign*> n_value;
+        std::variant<node_scope*, node_if*, node_return*, node_reassign*> n_value;
     };
 
     struct node_scoped_statement

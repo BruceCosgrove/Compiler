@@ -133,12 +133,14 @@ namespace shl
 
     node_statement* parser::try_parse_statement()
     {
-        if (auto n_reassign = try_parse_reassign())
-            return _allocator.allocate<node_statement>(n_reassign);
         if (auto n_scope = try_parse_scope())
             return _allocator.allocate<node_statement>(n_scope);
+        if (auto n_if = try_parse_if())
+            return _allocator.allocate<node_statement>(n_if);
         if (auto n_return = try_parse_return())
             return _allocator.allocate<node_statement>(n_return);
+        if (auto n_reassign = try_parse_reassign())
+            return _allocator.allocate<node_statement>(n_reassign);
         return nullptr;
     }
 

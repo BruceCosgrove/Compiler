@@ -10,8 +10,8 @@ foo: (x: let, y: let; a: let, b: let, c: let) = {
     y = b - c * z;
 }
 
-main: (status: let; argc: let, argv: let) = {
-    //foo, bar := foo(1, 2, 3);
-    barbar = foofoo;
-    status = barbar;
-}
+main: (status: let; argc: let, argv: let) =
+    if 1
+        if 1 {
+            status = 5;
+        }
