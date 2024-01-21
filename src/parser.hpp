@@ -39,7 +39,6 @@ namespace shl
         [[nodiscard]] node_if* try_parse_if(bool if_consumed = false);
         [[nodiscard]] node_scoped_if* try_parse_scoped_if();
         // [[nodiscard]] node_binary_expression* try_parse_binary_expression();
-        // [[nodiscard]] node_parenthesised_expression* try_parse_parenthesised_expression();
 
         // Correspondence: Trivial grammar rule.
 

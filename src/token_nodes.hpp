@@ -31,7 +31,6 @@ namespace shl
     struct node_reassign;
     struct node_scoped_if;
     struct node_binary_expression;
-    struct node_parenthesised_expression;
 
     // Correspondence: Trivial grammar rule.
 
@@ -83,7 +82,6 @@ namespace shl
         node_reassign*, \
         node_scoped_if*, \
         node_binary_expression*, \
-        node_parenthesised_expression*, \
         node_binary_operator*, \
         node_parameter_pass*, \
         node_integer_literal*, \
@@ -174,7 +172,7 @@ namespace shl
 
     struct node_term
     {
-        std::variant<node_integer_literal*, node_identifier*, node_parenthesised_expression*> n_value;
+        std::variant<node_integer_literal*, node_identifier*, node_expression*> n_value;
     };
 
 
@@ -208,11 +206,6 @@ namespace shl
         node_expression* n_expression_lhs;
         node_binary_operator* n_binary_operator;
         node_expression* n_expression_rhs;
-    };
-
-    struct node_parenthesised_expression
-    {
-        node_expression* n_expression;
     };
 
 

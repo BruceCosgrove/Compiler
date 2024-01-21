@@ -240,9 +240,9 @@ namespace shl
             VERBOSE_OUT(input::verbose_level::indentation, "binary expression\n", true);
 
             bool expand_lhs = std::holds_alternative<node_binary_expression*>(node->n_expression_lhs->n_value) ||
-                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
+                std::holds_alternative<node_expression*>(std::get<node_term*>(node->n_expression_lhs->n_value)->n_value);
             bool expand_rhs = std::holds_alternative<node_binary_expression*>(node->n_expression_rhs->n_value) ||
-                std::holds_alternative<node_parenthesised_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
+                std::holds_alternative<node_expression*>(std::get<node_term*>(node->n_expression_rhs->n_value)->n_value);
 
             if (!expand_lhs && !expand_rhs) // both are leaves
             {
@@ -268,12 +268,6 @@ namespace shl
                 g.output() << "pop rax\n";
                 g.visit(this, "binary operator", cast_variant<NODE_TYPES>(node->n_binary_operator->n_value));
             }
-        }
-
-        void operator()(const node_parenthesised_expression* node)
-        {
-            VERBOSE_OUT(input::verbose_level::indentation, "parenthesised expression\n", true);
-            g.visit(this, "expression", cast_variant<NODE_TYPES>(node->n_expression->n_value));
         }
 
         void operator()(const node_binary_operator* node)

@@ -66,7 +66,7 @@ run: $(EXE)
 # Clears the terminal and compiles the necessary files.
 # If successful, also runs the test.
 .PHONY: crun
-crun: clean run
+crun: clear run
 
 # Clears the terminal and recompiles everything.
 # If successful, also runs the test.

@@ -194,7 +194,7 @@ namespace shl
         {
             auto n_term = _allocator.allocate<node_term>();
             if (auto n_expression = try_parse(&parser::try_parse_expression, "Expected expression", 0))
-                n_term->n_value = _allocator.allocate<node_parenthesised_expression>(n_expression);
+                n_term->n_value = n_expression;
             try_consume(token_type::close_parenthesis_, "Expected ')'");
             return n_term;
         }
