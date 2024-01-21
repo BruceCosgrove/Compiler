@@ -33,6 +33,8 @@ namespace shl
         if_,
         elif_,
         else_,
+        while_,
+        dowhile_,
 
         // Correspondence: Binary-only operators.
 

@@ -15,15 +15,17 @@ namespace shl
                 tokens.emplace_back(token_type::integer_literal_, line_number, get_column_count(), *token_value);
             else if (auto token_value = try_consume_identifier())
             {
-                     if (token_value == "return") tokens.emplace_back(token_type::return_, line_number, get_column_count());
-                else if (token_value == "if")     tokens.emplace_back(token_type::if_, line_number, get_column_count());
-                else if (token_value == "elif")   tokens.emplace_back(token_type::elif_, line_number, get_column_count());
-                else if (token_value == "else")   tokens.emplace_back(token_type::else_, line_number, get_column_count());
-                else if (token_value == "in")     tokens.emplace_back(token_type::in_, line_number, get_column_count());
-                else if (token_value == "out")    tokens.emplace_back(token_type::out_, line_number, get_column_count());
-                else if (token_value == "inout")  tokens.emplace_back(token_type::inout_, line_number, get_column_count());
-                else if (token_value == "copy")   tokens.emplace_back(token_type::copy_, line_number, get_column_count());
-                else if (token_value == "move")   tokens.emplace_back(token_type::move_, line_number, get_column_count());
+                     if (token_value == "return")  tokens.emplace_back(token_type::return_, line_number, get_column_count());
+                else if (token_value == "if")      tokens.emplace_back(token_type::if_, line_number, get_column_count());
+                else if (token_value == "elif")    tokens.emplace_back(token_type::elif_, line_number, get_column_count());
+                else if (token_value == "else")    tokens.emplace_back(token_type::else_, line_number, get_column_count());
+                else if (token_value == "while")   tokens.emplace_back(token_type::while_, line_number, get_column_count());
+                else if (token_value == "dowhile") tokens.emplace_back(token_type::dowhile_, line_number, get_column_count());
+                else if (token_value == "in")      tokens.emplace_back(token_type::in_, line_number, get_column_count());
+                else if (token_value == "out")     tokens.emplace_back(token_type::out_, line_number, get_column_count());
+                else if (token_value == "inout")   tokens.emplace_back(token_type::inout_, line_number, get_column_count());
+                else if (token_value == "copy")    tokens.emplace_back(token_type::copy_, line_number, get_column_count());
+                else if (token_value == "move")    tokens.emplace_back(token_type::move_, line_number, get_column_count());
                 else tokens.emplace_back(token_type::identifier_, line_number, get_column_count(), *token_value);
             }
             else if (try_consume_token('(')) tokens.emplace_back(token_type::open_parenthesis_, line_number, get_column_count());
