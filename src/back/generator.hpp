@@ -1,7 +1,7 @@
 #pragma once
 
+#include "ast.hpp"
 #include "input.hpp"
-#include "token_nodes.hpp"
 #include <sstream>
 #include <string>
 #include <vector>

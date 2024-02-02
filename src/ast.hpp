@@ -153,7 +153,7 @@ namespace shl
 
     struct node_scope
     {
-        std::vector<node_scoped_statement*> scoped_statements;
+        std::vector<node_scoped_statement*> scoped_statements; // 0 or more
     };
 
     struct node_statement

@@ -8,11 +8,11 @@
 
 namespace shl
 {
-    class tokenizer : consumer<std::string>
+    class lexer : consumer<std::string>
     {
     public:
-        [[nodiscard]] explicit tokenizer(const std::string& source_code) noexcept : consumer<std::string>(source_code) {}
-        [[nodiscard]] explicit tokenizer(std::string&& source_code) noexcept : consumer<std::string>(std::move(source_code)) {}
+        [[nodiscard]] explicit lexer(const std::string& source_code) noexcept : consumer<std::string>(source_code) {}
+        [[nodiscard]] explicit lexer(std::string&& source_code) noexcept : consumer<std::string>(std::move(source_code)) {}
 
         [[nodiscard]] std::vector<token> operator()();
 

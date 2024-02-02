@@ -15,6 +15,8 @@ CXXFLAGS.release := -O2
 
 # The directory where all source files are located.
 SRC_DIR := src/
+# The directories where include files are located.
+INC_DIRS := $(SRC_DIR)
 # The directory where all intermediate files should be placed.
 INT_DIR_ROOT := bin-int/
 INT_DIR := $(INT_DIR_ROOT)$(cfg)/
@@ -24,6 +26,8 @@ OUT_DIR := $(OUT_DIR_ROOT)$(cfg)/
 
 # Get all source filepaths in $(SRC_DIR) and all subdirectories of $(SRC_DIR).
 SRCS := $(wildcard $(SRC_DIR)*.cpp) $(wildcard $(SRC_DIR)**/*.cpp)
+# Get all include filepaths in $(INC_DIRS).
+INCS := $(patsubst %,-I %,$(INC_DIRS))
 # Get each obj filepath corresponding to each source filepath.
 OBJS := $(patsubst $(SRC_DIR)%.cpp,$(INT_DIR)%.o,$(SRCS))
 # Get each dependency filepath corresponding to each source filepath.
@@ -46,7 +50,7 @@ all: $(EXE) $(MAKEFILE)
 
 # Create necessary directories, compile, get dependencies, and make sure to recompile everything if the makefile changed.
 $(INT_DIR)%.o: $(SRC_DIR)%.cpp $(MAKEFILE) | create_dirs
-	$(COMPILER) $(CXXFLAGS) -MMD -c -o $@ $<
+	$(COMPILER) $(CXXFLAGS) -MMD -c $(INCS) -o $@ $<
 
 # Link all objs into the executable.
 $(EXE): $(OBJS) $(MAKEFILE)

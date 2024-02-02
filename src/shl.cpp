@@ -1,9 +1,9 @@
 #include "error.hpp"
 #include "fileio.hpp"
-#include "generator.hpp"
 #include "input.hpp"
-#include "parser.hpp"
-#include "tokenizer.hpp"
+#include "front/lexer.hpp"
+#include "front/parser.hpp"
+#include "back/generator.hpp"
 
 using namespace shl;
 
@@ -16,8 +16,8 @@ int main(int argc, char* argv[])
     if (!fileio::read(input.in_path, in_file_contents))
         error_exit("Input", "Unable to open input file");
 
-    tokenizer tokenizer(std::move(in_file_contents));
-    parser parser(tokenizer());
+    lexer lexer(std::move(in_file_contents));
+    parser parser(lexer());
     generator generator(parser());
     auto assembly = generator();
 
