@@ -1,7 +1,7 @@
 #include "input.hpp"
-#include "ctype.hpp"
-#include "error.hpp"
-#include "util.hpp"
+#include "common/ctype.hpp"
+#include "common/error.hpp"
+#include "common/util.hpp"
 #include <iostream>
 #include <getopt.h> // https://linux.die.net/man/3/optarg
 

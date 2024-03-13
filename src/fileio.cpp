@@ -17,7 +17,7 @@ namespace shl::fileio
                 return file_stream.good();
             }
         }
-        catch(...) {}
+        catch (...) {}
         return false;
     }
 
@@ -32,7 +32,7 @@ namespace shl::fileio
                 return file_stream.good();
             }
         }
-        catch(...) {}
+        catch (...) {}
         return false;
     }
 } // namespace shl::fileio

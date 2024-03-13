@@ -1,6 +1,6 @@
 #include "lexer.hpp"
-#include "error.hpp"
-#include "ctype.hpp"
+#include "common/error.hpp"
+#include "common/ctype.hpp"
 
 namespace shl
 {

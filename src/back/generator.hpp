@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ast.hpp"
 #include "input.hpp"
+#include "middle/ast.hpp"
 #include <sstream>
 #include <string>
 #include <vector>

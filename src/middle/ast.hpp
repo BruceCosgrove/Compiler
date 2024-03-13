@@ -1,6 +1,6 @@
 #pragma once
 
-#include "token.hpp"
+#include "front/token.hpp" // TODO: try to remove.
 #include <variant>
 #include <vector>
 

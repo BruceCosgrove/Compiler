@@ -1,6 +1,6 @@
-#include "error.hpp"
 #include "fileio.hpp"
 #include "input.hpp"
+#include "common/error.hpp"
 #include "front/lexer.hpp"
 #include "front/parser.hpp"
 #include "back/generator.hpp"

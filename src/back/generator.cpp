@@ -1,6 +1,6 @@
 #include "generator.hpp"
-#include "error.hpp"
-#include "util.hpp"
+#include "common/error.hpp"
+#include "common/util.hpp"
 #include <algorithm>
 #include <cassert>
 #include <iostream> // DEBUG

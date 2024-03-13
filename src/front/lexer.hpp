@@ -1,7 +1,7 @@
 #pragma once
 
-#include "consumer.hpp"
-#include "token.hpp"
+#include "common/consumer.hpp"
+#include "front/token.hpp"
 #include <optional>
 #include <string>
 #include <vector>

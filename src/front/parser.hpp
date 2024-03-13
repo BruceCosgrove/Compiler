@@ -1,10 +1,10 @@
 #pragma once
 
-#include "arena_allocator.hpp"
-#include "ast.hpp"
-#include "consumer.hpp"
-#include "error.hpp"
-#include "token.hpp"
+#include "common/arena_allocator.hpp"
+#include "common/consumer.hpp"
+#include "common/error.hpp"
+#include "front/token.hpp"
+#include "middle/ast.hpp"
 #include <vector>
 
 namespace shl
