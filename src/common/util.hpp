@@ -18,6 +18,9 @@ namespace shl
         );
     }
 
+	template <typename T, typename... Ts>
+	constexpr bool is_any_of_v = (std::is_same_v<T, Ts> || ...);
+
     // Return a new string with the contents of string, while having after inserted after each character in string.
     std::string insert_after_each(std::string_view string, std::string_view after);
 } // namespace shl
