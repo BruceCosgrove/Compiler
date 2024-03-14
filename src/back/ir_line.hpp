@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/ranged_enum.hpp"
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -7,28 +8,31 @@
 namespace shl
 {
     // Operations.
-    enum class ir_op
-    {
-        // boolean
+    DEFINE_RANGED_ENUM(ir_op,
+        (
+            // boolean
 
-        gt, // >
-        ge, // >=
-        lt, // <
-        le, // <=
-        eq, // ==
-        ne, // !=
+            gt, // >
+            ge, // >=
+            lt, // <
+            le, // <=
+            eq, // ==
+            ne, // !=
 
-        // arithmetic
+            // arithmetic
 
-        div, // /
-        mod, // %
-        mul, // *
-        add, // +
-        sub, // -
-
-        // TODO: generalize token.hpp's enum to a #define with operators.
-        // Might need FOR_EACH macro to not duplicate definition of ranges.
-    };
+            div, // /
+            mod, // %
+            mul, // *
+            add, // +
+            sub  // -
+        ),
+        // Ranges
+        (
+            (boolean, gt, ne + 1),
+            (arithmetic, div, sub + 1)
+        )
+    );
 
     // Declare all the line types.
 

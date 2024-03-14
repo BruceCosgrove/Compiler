@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/ranged_enum.hpp"
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -7,88 +8,66 @@
 
 namespace shl
 {
-    enum class token_type
-    {
-        // Correspondence: Literal characters in grammar rules.
+    DEFINE_RANGED_ENUM(token_type,
+        (
+            // Correspondence: Literal characters in grammar rules.
 
-        open_parenthesis_,  // (
-        close_parenthesis_, // )
-        open_brace_,        // {
-        close_brace_,       // }
-        open_bracket_,      // [
-        close_bracket_,     // ]
-        colon_,             // :
-        semicolon_,         // ;
-        comma_,             // ,
-        equals_,            // =
+            open_parenthesis_,  // (
+            close_parenthesis_, // )
+            open_brace_,        // {
+            close_brace_,       // }
+            open_bracket_,      // [
+            close_bracket_,     // ]
+            colon_,             // :
+            semicolon_,         // ;
+            comma_,             // ,
+            equals_,            // =
 
-        // Correspondence: Trivial grammar rule.
+            // Correspondence: Trivial grammar rule.
 
-        integer_literal_,
-        identifier_,
+            integer_literal_,
+            identifier_,
 
-        // Correspondence: Non-trivial grammar rule case.
+            // Correspondence: Non-trivial grammar rule case.
 
-        return_,
-        if_,
-        elif_,
-        else_,
-        while_,
-        dowhile_,
+            return_,
+            if_,
+            elif_,
+            else_,
+            while_,
+            dowhile_,
 
-        // Correspondence: Binary-only operators.
+            // Correspondence: Binary-only operators.
 
-        forward_slash_, // binary: division
-        percent_,       // binary: modulo
+            forward_slash_, // binary: division
+            percent_,       // binary: modulo
 
-        // Correspondence: Binary and unary operators.
+            // Correspondence: Binary and unary operators.
 
-        asterisk_, // binary: multiplication, unary: indirection/dereference
-        plus_,     // binary: addition,       unary: promotion
-        minus_,    // binary: subtraction,    unary: negation
+            asterisk_, // binary: multiplication, unary: indirection/dereference
+            plus_,     // binary: addition,       unary: promotion
+            minus_,    // binary: subtraction,    unary: negation
 
-        // Correspondence: Unary-only operators
+            // Correspondence: Unary-only operators
 
-        // _tilde, // unary: bitwise not
+            // _tilde, // unary: bitwise not
 
-        // Correspondence: Parameter passing.
+            // Correspondence: Parameter passing.
 
-        in_,
-        out_,
-        inout_,
-        copy_,
-        move_,
-
-        // Internals.
-        _count,
-
-        _binary_operators_begin = forward_slash_,
-        _binary_operators_end = minus_ + 1,
-
-        _unary_operators_begin = asterisk_,
-        _unary_operators_end = minus_ + 1,
-
-        _binary_and_unary_operators_begin = _unary_operators_begin,
-        _binary_and_unary_operators_end = _binary_operators_end,
-
-        _operators_begin = _binary_operators_begin,
-        _operators_end = _unary_operators_end,
-    };
-
-    [[nodiscard]] constexpr auto operator+(const token_type type) noexcept
-    { return static_cast<std::underlying_type_t<token_type>>(type); }
-
-    [[nodiscard]] constexpr bool is_binary_operator(const token_type type) noexcept
-    { return +token_type::_binary_operators_begin <= +type && +type < +token_type::_binary_operators_end; }
-
-    [[nodiscard]] constexpr bool is_unary_operator(const token_type type) noexcept
-    { return +token_type::_unary_operators_begin <= +type && +type < +token_type::_unary_operators_end; }
-
-    [[nodiscard]] constexpr bool is_binary_and_unary_operator(const token_type type) noexcept
-    { return +token_type::_binary_and_unary_operators_begin <= +type && +type < +token_type::_binary_and_unary_operators_end; }
-
-    [[nodiscard]] constexpr bool is_operator(const token_type type) noexcept
-    { return +token_type::_operators_begin <= +type && +type < +token_type::_operators_end; }
+            in_,
+            out_,
+            inout_,
+            copy_,
+            move_
+        ),
+        // Ranges
+        (
+            (binary_operator, forward_slash_, minus_ + 1),
+            (unary_operator, asterisk_, minus_ + 1),
+            (binary_and_unary_operator, _range_unary_operators_begin, _range_binary_operators_end),
+            (operator, _range_binary_operators_begin, _range_unary_operators_end)
+        )
+    );
 
     [[nodiscard]] constexpr std::optional<std::uint8_t> get_operator_precedence(const token_type type) noexcept
     {
@@ -103,7 +82,7 @@ namespace shl
                 0, // token_type::plus_
                 0, // token_type::minus_
             });
-            return precedences[+type - +token_type::_operators_begin];
+            return precedences[+type - +token_type::_range_operators_begin];
         }
         return std::nullopt;
     }

@@ -9,7 +9,7 @@ TEST_DIR := test/
 cfg := debug
 
 # The compiler flags to use.
-CXXFLAGS := -std=c++23 -Wall -Werror=return-type
+CXXFLAGS := -std=c++23 -Wall -Werror
 CXXFLAGS.debug := -g
 CXXFLAGS.release := -O2
 
